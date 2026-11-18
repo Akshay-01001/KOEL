@@ -1,0 +1,22 @@
+# Local development: LiveKit in dev mode.
+#
+#   docker compose up -d          # start
+#   docker compose logs -f        # watch logs
+#   docker compose down           # stop
+#
+# Dev mode uses API key "devkey" and secret "secret" and listens on ws://localhost:7880.
+# Matching server/.env:
+#   LIVEKIT_URL=ws://localhost:7880
+#   LIVEKIT_API_KEY=devkey
+#   LIVEKIT_API_SECRET=secret
+
+services:
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    container_name: koel-livekit
+    command: --dev --bind 0.0.0.0
+    ports:
+      - "7880:7880" # signaling WebSocket + Room API
+      - "7881:7881" # media over TCP (fallback)
+      - "7882:7882/udp" # media over UDP
+    restart: unless-stopped

@@ -1,25 +1,30 @@
-import axios from "axios";
-import { useEffect } from "react";
+import { useState } from "react";
+import JoinForm from "./components/JoinForm";
+import CallRoom from "./components/CallRoom";
+import type { JoinConnection } from "./api/room";
+
+// The room name lives in the URL (?room=...) so a call link can be shared.
+const roomFromUrl = () =>
+    new URLSearchParams(window.location.search).get("room") ?? "test-room";
 
 export default function App() {
-    useEffect(() => {
-        const fetchIceServers = async () => {
-            try {
-                const response = await axios.get(
-                    `${import.meta.env.VITE_SERVER_URL}/ice-servers`,
-                );
-                console.log(response);
-            } catch {
-                return [];
-            }
-        };
+    const [connection, setConnection] = useState<JoinConnection | null>(null);
 
-        fetchIceServers();
-    });
+    if (!connection) {
+        return (
+            <JoinForm
+                defaultRoom={roomFromUrl()}
+                onJoined={(conn, roomName) => {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("room", roomName);
+                    window.history.replaceState(null, "", url);
+                    setConnection(conn);
+                }}
+            />
+        );
+    }
 
     return (
-        <main className="flex min-h-screen items-center justify-center bg-black">
-            <h1 className="text-5xl font-bold text-yellow-600">Hello Koel</h1>
-        </main>
+        <CallRoom connection={connection} onLeave={() => setConnection(null)} />
     );
 }
