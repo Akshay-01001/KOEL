@@ -70,7 +70,7 @@ export default function LoginRightSection() {
                     />
                     <button
                         type="button"
-                        className="justify-self-end text-sm font-medium text-foreground hover:underline"
+                        className="cursor-pointer justify-self-end text-sm font-medium text-foreground hover:underline"
                     >
                         Forgot password?
                     </button>
