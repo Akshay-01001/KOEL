@@ -38,11 +38,11 @@ export default function MeetingHeader({
     };
 
     return (
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-panel px-4 py-2.5 text-foreground">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-panel px-4 py-2.5 font-sans text-foreground">
             <h1 className="truncate font-display text-base font-semibold">
                 {title}
             </h1>
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
                 <span className="inline-flex h-7 items-center rounded-full bg-control px-2.5 font-mono text-[13px] tracking-[0.02em]">
                     {meetingCode}
                 </span>

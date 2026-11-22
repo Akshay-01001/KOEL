@@ -20,6 +20,7 @@ import type {
 import GuestPreJoin from "@/components/Meeting/GuestPreJoin";
 import MeetingHeader from "@/components/Meeting/MeetingHeader";
 import MeetingStatusScreen from "@/components/Meeting/MeetingStatusScreen";
+import NoiseFilter from "@/components/Meeting/NoiseFilter";
 import { Button } from "@/components/ui/button";
 import { getMeetingPath, parseMeetingCode } from "@/lib/meetingCode";
 import { useAppSelector } from "@/store/hooks";
@@ -333,10 +334,6 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
 
     return (
         <div className="dark flex h-dvh flex-col bg-background">
-            <MeetingHeader
-                title={connection.meeting.title}
-                meetingCode={connection.meeting.meeting_code}
-            />
             <LiveKitRoom
                 serverUrl={connection.url}
                 token={connection.token}
@@ -349,9 +346,17 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
                     console.warn("Media device failure:", kind, failure);
                 }}
                 data-lk-theme="default"
-                className="min-h-0 flex-1"
+                className="flex min-h-0 flex-1 flex-col"
             >
-                <VideoConference />
+                {/* Krisp noise cancellation, always on; renders nothing. */}
+                <NoiseFilter />
+                <MeetingHeader
+                    title={connection.meeting.title}
+                    meetingCode={connection.meeting.meeting_code}
+                />
+                <div className="min-h-0 flex-1">
+                    <VideoConference />
+                </div>
             </LiveKitRoom>
         </div>
     );
