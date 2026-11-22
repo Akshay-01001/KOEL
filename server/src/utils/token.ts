@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
+import type { CookieOptions, Response } from "express";
 import jwt from "jsonwebtoken";
+import { isProduction } from "./constants.js";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -30,6 +32,29 @@ export const verifyToken = (token: string): TokenPayload | null => {
     } catch {
         return null;
     }
+};
+
+export const AUTH_COOKIE_NAME = "token";
+
+// Setting and clearing must use the same options, or the browser keeps the cookie.
+const getAuthCookieOptions = (): CookieOptions => {
+    return {
+        httpOnly: true,
+        secure: isProduction(),
+        sameSite: isProduction() ? "none" : "lax",
+        path: "/",
+    };
+};
+
+export const setAuthCookie = (res: Response, token: string) => {
+    res.cookie(AUTH_COOKIE_NAME, token, {
+        ...getAuthCookieOptions(),
+        maxAge: TOKEN_TTL_SECONDS * 1000,
+    });
+};
+
+export const clearAuthCookie = (res: Response) => {
+    res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
 };
 
 // SHA-256 of the token, which is what gets stored in the DB.

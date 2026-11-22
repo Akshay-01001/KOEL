@@ -1,9 +1,6 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import type {
-    MeetingSettings,
-    RecordingAccess,
-} from "@/api/types/payload.types";
+import type { MeetingSettings } from "@/api/types/payload.types";
 import SettingSwitch from "@/components/Schedule/SettingSwitch";
 import { cn } from "@/lib/utils";
 
@@ -47,20 +44,6 @@ const IN_MEETING_ROWS: SwitchRow[] = [
         key: "screen_share_enabled",
         label: "Screen sharing",
         description: "Everyone can share their screen.",
-    },
-];
-
-// "Specific people" from the design is left out until recordings exist to share.
-const WATCH_OPTIONS: {
-    value: RecordingAccess;
-    label: string;
-    description: string;
-}[] = [
-    { value: "host_only", label: "Host only", description: "Just you." },
-    {
-        value: "participants",
-        label: "Everyone who attended",
-        description: "Anyone who was in the meeting.",
     },
 ];
 
@@ -193,48 +176,6 @@ export default function MoreOptions({ settings, onChange }: MoreOptionsProps) {
                                 })}
                             </div>
                         </div>
-
-                        <fieldset className="flex flex-col gap-2">
-                            <legend className="mb-2.5 text-[15px] font-medium">
-                                Who can watch recordings
-                            </legend>
-                            {WATCH_OPTIONS.map((option) => {
-                                const isChecked =
-                                    settings.recording_access === option.value;
-                                return (
-                                    <label
-                                        key={option.value}
-                                        className={cn(
-                                            "flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-3",
-                                            isChecked
-                                                ? "border-primary bg-[color-mix(in_oklch,var(--primary)_8%,var(--card))]"
-                                                : "border-border",
-                                        )}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="recording-access"
-                                            checked={isChecked}
-                                            onChange={() => {
-                                                onChange({
-                                                    recording_access:
-                                                        option.value,
-                                                });
-                                            }}
-                                            className="mt-0.5 size-[18px] shrink-0 accent-primary"
-                                        />
-                                        <span className="flex flex-col gap-0.5">
-                                            <span className="text-[15px] font-medium">
-                                                {option.label}
-                                            </span>
-                                            <span className="text-[13px] leading-[1.45] text-muted-foreground">
-                                                {option.description}
-                                            </span>
-                                        </span>
-                                    </label>
-                                );
-                            })}
-                        </fieldset>
                     </div>
                 </div>
             )}

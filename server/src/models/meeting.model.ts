@@ -18,12 +18,6 @@ export enum WhoCanRecord {
     ANYONE = "anyone",
 }
 
-export enum RecordingAccess {
-    HOST_ONLY = "host_only",
-    PARTICIPANTS = "participants",
-    CUSTOM = "custom",
-}
-
 const meetingSettingsSchema = new Schema(
     {
         chat_enabled: {
@@ -38,11 +32,6 @@ const meetingSettingsSchema = new Schema(
             type: String,
             enum: Object.values(WhoCanRecord),
             default: WhoCanRecord.HOST_ONLY,
-        },
-        recording_access: {
-            type: String,
-            enum: Object.values(RecordingAccess),
-            default: RecordingAccess.HOST_ONLY,
         },
         guest_access: {
             type: Boolean,

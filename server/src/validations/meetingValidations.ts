@@ -1,12 +1,11 @@
 import Joi from "joi";
-import { RecordingAccess, WhoCanRecord } from "../models/meeting.model.js";
+import { WhoCanRecord } from "../models/meeting.model.js";
 import { GUEST_ID_PATTERN } from "../utils/functions.js";
 
 export type MeetingSettingsBody = {
     chat_enabled?: boolean;
     screen_share_enabled?: boolean;
     who_can_record?: WhoCanRecord;
-    recording_access?: RecordingAccess;
     guest_access?: boolean;
     join_approval_required?: boolean;
 };
@@ -23,7 +22,6 @@ const meetingSettingsSchema = Joi.object<MeetingSettingsBody>({
     chat_enabled: Joi.boolean(),
     screen_share_enabled: Joi.boolean(),
     who_can_record: Joi.string().valid(...Object.values(WhoCanRecord)),
-    recording_access: Joi.string().valid(...Object.values(RecordingAccess)),
     guest_access: Joi.boolean(),
     join_approval_required: Joi.boolean(),
 });

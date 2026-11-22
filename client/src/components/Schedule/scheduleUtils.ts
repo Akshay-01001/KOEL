@@ -5,7 +5,6 @@ export const DEFAULT_MEETING_SETTINGS: MeetingSettings = {
     chat_enabled: true,
     screen_share_enabled: true,
     who_can_record: "host_only",
-    recording_access: "host_only",
     guest_access: false,
     join_approval_required: true,
 };

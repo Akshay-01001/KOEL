@@ -13,13 +13,10 @@ export type RegisterPayload = {
 
 export type WhoCanRecord = "host_only" | "anyone";
 
-export type RecordingAccess = "host_only" | "participants" | "custom";
-
 export type MeetingSettings = {
     chat_enabled: boolean;
     screen_share_enabled: boolean;
     who_can_record: WhoCanRecord;
-    recording_access: RecordingAccess;
     guest_access: boolean;
     join_approval_required: boolean;
 };

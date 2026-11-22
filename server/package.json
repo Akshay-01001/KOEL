@@ -24,8 +24,7 @@
         "joi": "^18.3.2",
         "jsonwebtoken": "^9.0.3",
         "livekit-server-sdk": "^2.20.0",
-        "mongoose": "^9.12.3",
-        "ws": "^8.23.0"
+        "mongoose": "^9.12.3"
     },
     "devDependencies": {
         "@types/cookie-parser": "^1.4.10",
@@ -33,7 +32,6 @@
         "@types/express": "^5.0.6",
         "@types/jsonwebtoken": "^9.0.10",
         "@types/node": "^26.6.6",
-        "@types/ws": "^8.18.2",
         "prettier": "3.10.1",
         "tsx": "^4.23.15",
         "typescript": "^7.0.2"

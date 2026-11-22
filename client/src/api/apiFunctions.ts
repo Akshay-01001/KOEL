@@ -37,6 +37,12 @@ export async function register(payload: RegisterPayload) {
     return getData(data);
 }
 
+// Ends this browser's session on the server and clears the cookie.
+export async function logout() {
+    const { data } = await api.post<ApiResponse<null>>("/api/auth/logout");
+    return data.message;
+}
+
 export async function getMe(signal?: AbortSignal) {
     const { data } = await api.get<ApiResponse<User>>("/api/auth/me", {
         signal,

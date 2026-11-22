@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
-import { ChevronDown } from "lucide-react";
+import { Link, useNavigate } from "react-router";
+import { ChevronDown, LoaderCircle, LogOut } from "lucide-react";
+import { logout } from "@/api/apiFunctions";
+import { getApiErrorMessage } from "@/api/api";
 import KoelLogo from "@/components/common/KoelLogo";
 import ThemeToggle from "@/components/common/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { clearUser } from "@/store/slices/userSlice";
 
 // "Riya Sharma" -> "RS"; a single name gives one letter.
 function getInitials(name: string) {
@@ -24,8 +27,30 @@ export default function Navbar() {
     const user = useAppSelector((state) => {
         return state.user.user;
     });
+    const dispatch = useAppDispatch();
+    const navigate = useNavigate();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isSigningOut, setIsSigningOut] = useState(false);
+    const [signOutError, setSignOutError] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+
+    // Only signs out locally once the server has dropped the session; otherwise
+    // the cookie would still be there and a reload would sign them back in.
+    const handleSignOut = async () => {
+        setIsSigningOut(true);
+        setSignOutError(null);
+        try {
+            await logout();
+        } catch (error) {
+            setSignOutError(getApiErrorMessage(error));
+            setIsSigningOut(false);
+            return;
+        }
+        setIsMenuOpen(false);
+        setIsSigningOut(false);
+        dispatch(clearUser());
+        navigate("/login", { replace: true });
+    };
 
     // Close the account menu on an outside click or Escape.
     useEffect(() => {
@@ -100,14 +125,47 @@ export default function Navbar() {
                                 <div
                                     role="menu"
                                     aria-label="Account"
-                                    className="absolute top-full right-0 z-20 mt-2 w-64 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg"
+                                    className="absolute top-full right-0 z-20 mt-2 w-64 rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
                                 >
-                                    <p className="truncate text-sm font-semibold">
-                                        {user.name}
-                                    </p>
-                                    <p className="truncate text-sm text-muted-foreground">
-                                        {user.email}
-                                    </p>
+                                    <div className="px-3 py-2">
+                                        <p className="truncate text-sm font-semibold">
+                                            {user.name}
+                                        </p>
+                                        <p className="truncate text-sm text-muted-foreground">
+                                            {user.email}
+                                        </p>
+                                    </div>
+                                    <div
+                                        role="separator"
+                                        className="my-1 h-px bg-border"
+                                    />
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        autoFocus
+                                        disabled={isSigningOut}
+                                        onClick={() => {
+                                            void handleSignOut();
+                                        }}
+                                        className="flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium outline-none hover:bg-muted focus-visible:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {isSigningOut ? (
+                                            <LoaderCircle className="size-4 text-muted-foreground motion-safe:animate-spin" />
+                                        ) : (
+                                            <LogOut className="size-4 text-muted-foreground" />
+                                        )}
+                                        {isSigningOut
+                                            ? "Signing out…"
+                                            : "Sign out"}
+                                    </button>
+                                    {signOutError && (
+                                        <p
+                                            role="alert"
+                                            className="px-3 pt-1 pb-2 text-[13px] text-destructive"
+                                        >
+                                            {signOutError}
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>

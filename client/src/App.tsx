@@ -9,6 +9,7 @@ import {
 } from "react-router";
 import { getMe } from "@/api/apiFunctions";
 import Layout from "@/components/common/Layout";
+import SessionExpiryHandler from "@/components/common/SessionExpiryHandler";
 import Home from "@/components/Home/Home";
 import MeetingPage from "@/components/Meeting/MeetingRoom";
 import ScheduleMeeting from "@/components/Schedule/ScheduleMeeting";
@@ -73,6 +74,7 @@ export default function App() {
 
     return (
         <BrowserRouter>
+            <SessionExpiryHandler />
             <Routes>
                 {/* Open to everyone. Guests see a join-only home page and can
                     join meetings that allow guests. */}

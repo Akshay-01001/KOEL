@@ -3,9 +3,15 @@ import bcrypt from "bcryptjs";
 import { AuthProvider, UserModel } from "../models/user.model.js";
 import { TokenModel } from "../models/token.model.js";
 import { loginSchema, registerSchema } from "../validations/authValidations.js";
-import { isProduction } from "../utils/constants.js";
 import { sendResponse, sendValidationError } from "../utils/response.js";
-import { generateToken, hashToken, TOKEN_TTL_SECONDS } from "../utils/token.js";
+import {
+    AUTH_COOKIE_NAME,
+    clearAuthCookie,
+    generateToken,
+    hashToken,
+    setAuthCookie,
+    TOKEN_TTL_SECONDS,
+} from "../utils/token.js";
 
 // Issues a JWT, stores its hash in the DB, and sends the raw token as a cookie.
 const issueAuthToken = async (res: Response, userId: string, name: string) => {
@@ -17,12 +23,7 @@ const issueAuthToken = async (res: Response, userId: string, name: string) => {
         expires_at: new Date(Date.now() + TOKEN_TTL_SECONDS * 1000),
     });
 
-    res.cookie("token", token, {
-        httpOnly: true,
-        secure: isProduction(),
-        sameSite: isProduction() ? "none" : "lax",
-        maxAge: TOKEN_TTL_SECONDS * 1000,
-    });
+    setAuthCookie(res, token);
 };
 
 const toPublicUser = (user: {
@@ -137,5 +138,21 @@ export const getMe = async (req: Request, res: Response) => {
     } catch (error) {
         console.error("Failed to fetch user:", error);
         return sendResponse(res, 500, "Failed to fetch user");
+    }
+};
+
+// Ends this browser's session: removes the stored token and clears the cookie.
+// No auth needed, so an expired or already-revoked session can still sign out.
+export const logout = async (req: Request, res: Response) => {
+    const token: unknown = req.cookies?.[AUTH_COOKIE_NAME];
+    try {
+        if (typeof token === "string" && token) {
+            await TokenModel.deleteOne({ token_hash: hashToken(token) });
+        }
+        clearAuthCookie(res);
+        return sendResponse(res, 200, "Signed out");
+    } catch (error) {
+        console.error("Failed to sign out:", error);
+        return sendResponse(res, 500, "Failed to sign out");
     }
 };

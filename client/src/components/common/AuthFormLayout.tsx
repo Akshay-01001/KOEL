@@ -5,6 +5,8 @@ type AuthFormLayoutProps = {
     title: string;
     subtitle: string;
     googleLabel: string;
+    // Optional message above the Google button, e.g. "Your session expired".
+    notice?: ReactNode;
     children: ReactNode;
 };
 
@@ -14,6 +16,7 @@ export default function AuthFormLayout({
     title,
     subtitle,
     googleLabel,
+    notice,
     children,
 }: AuthFormLayoutProps) {
     return (
@@ -25,6 +28,15 @@ export default function AuthFormLayout({
                 {title}
             </h1>
             <p className="mt-3 text-base text-muted-foreground">{subtitle}</p>
+
+            {notice && (
+                <p
+                    role="status"
+                    className="mt-6 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground"
+                >
+                    {notice}
+                </p>
+            )}
 
             <GoogleButton label={googleLabel} className="mt-8" />
 

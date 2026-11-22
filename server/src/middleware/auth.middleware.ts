@@ -1,7 +1,14 @@
 import type { NextFunction, Request, Response } from "express";
 import { TokenModel } from "../models/token.model.js";
 import { sendResponse } from "../utils/response.js";
-import { hashToken, verifyToken } from "../utils/token.js";
+import {
+    AUTH_COOKIE_NAME,
+    clearAuthCookie,
+    hashToken,
+    verifyToken,
+} from "../utils/token.js";
+
+const SESSION_EXPIRED_MESSAGE = "Your session has expired. Sign in again.";
 
 type AuthCheck =
     | { status: "missing" }
@@ -10,7 +17,7 @@ type AuthCheck =
 
 // Reads the `token` cookie: a valid JWT whose hash is still stored in the DB.
 const checkAuthCookie = async (req: Request): Promise<AuthCheck> => {
-    const token: unknown = req.cookies?.token;
+    const token: unknown = req.cookies?.[AUTH_COOKIE_NAME];
     if (typeof token !== "string" || !token) return { status: "missing" };
 
     const payload = verifyToken(token);
@@ -39,7 +46,9 @@ export const requireAuth = async (
             return sendResponse(res, 401, "Not authenticated");
         }
         if (auth.status === "invalid") {
-            return sendResponse(res, 401, "Invalid or expired token");
+            // Expired, signed out elsewhere, or tampered with: drop the cookie too.
+            clearAuthCookie(res);
+            return sendResponse(res, 401, SESSION_EXPIRED_MESSAGE);
         }
 
         req.userId = auth.userId;
@@ -51,8 +60,9 @@ export const requireAuth = async (
     }
 };
 
-// Lets everyone through. Signed-in users get req.userId and req.name; anyone
-// else (no cookie, or an expired one) continues as a guest with req.userId unset.
+// Lets people without a cookie through as guests (req.userId unset); signed-in
+// users get req.userId and req.name. A cookie that is no longer valid gets a 401
+// (and is cleared), so a user whose session expired isn't silently turned into a guest.
 export const optionalAuth = async (
     req: Request,
     res: Response,
@@ -60,6 +70,10 @@ export const optionalAuth = async (
 ) => {
     try {
         const auth = await checkAuthCookie(req);
+        if (auth.status === "invalid") {
+            clearAuthCookie(res);
+            return sendResponse(res, 401, SESSION_EXPIRED_MESSAGE);
+        }
         if (auth.status === "ok") {
             req.userId = auth.userId;
             req.name = auth.name;

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { getApiErrorMessage } from "@/api/api";
-import { getRedirectTarget } from "@/lib/redirect";
+import { getRedirectTarget, isSessionExpired } from "@/lib/redirect";
 import { login } from "@/api/apiFunctions";
 import AuthFormLayout from "@/components/common/AuthFormLayout";
 import FormField from "@/components/common/FormField";
@@ -39,6 +39,11 @@ export default function LoginRightSection() {
             title="Welcome back"
             subtitle="Sign in to pick up where you left off."
             googleLabel="Sign in with Google"
+            notice={
+                isSessionExpired(location.state)
+                    ? "Your session expired. Sign in again to continue where you left off."
+                    : undefined
+            }
         >
             <form onSubmit={handleSubmit} className="grid gap-5">
                 <FormField
