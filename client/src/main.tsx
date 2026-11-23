@@ -3,11 +3,13 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import "./index.css";
 import App from "./App.tsx";
+import GlobalLoader from "@/components/common/GlobalLoader";
 import { store } from "@/store/store";
 
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
         <Provider store={store}>
+            <GlobalLoader />
             <App />
         </Provider>
     </StrictMode>,

@@ -1,18 +1,20 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { Calendar, LoaderCircle, Video } from "lucide-react";
 import { createInstantMeeting } from "@/api/apiFunctions";
 import { getApiErrorMessage } from "@/api/api";
+import ScheduleMeetingDialog from "@/components/Schedule/ScheduleMeetingDialog";
 import { Button } from "@/components/ui/button";
 import { getMeetingPath } from "@/lib/meetingCode";
 
 const INSTANT_MEETING_TITLE = "Instant meeting";
 
 // "Start now" creates a meeting on the server and drops the user into its room.
-// "Schedule" opens the schedule form.
+// "Schedule" opens the schedule modal.
 export default function NewMeetingCard() {
     const navigate = useNavigate();
     const [isStarting, setIsStarting] = useState(false);
+    const [isScheduleOpen, setIsScheduleOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleStartNow = async () => {
@@ -64,14 +66,15 @@ export default function NewMeetingCard() {
                         {isStarting ? "Starting…" : "Start now"}
                     </Button>
                     <Button
-                        asChild
+                        type="button"
                         variant="outline"
+                        onClick={() => {
+                            setIsScheduleOpen(true);
+                        }}
                         className="h-11 flex-[1_1_140px] border-input bg-card px-[18px] text-[15px]"
                     >
-                        <Link to="/schedule">
-                            <Calendar />
-                            Schedule
-                        </Link>
+                        <Calendar />
+                        Schedule
                     </Button>
                 </div>
                 {error && (
@@ -80,6 +83,11 @@ export default function NewMeetingCard() {
                     </p>
                 )}
             </div>
+
+            <ScheduleMeetingDialog
+                open={isScheduleOpen}
+                onOpenChange={setIsScheduleOpen}
+            />
         </div>
     );
 }

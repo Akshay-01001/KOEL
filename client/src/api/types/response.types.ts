@@ -71,6 +71,22 @@ export type UpcomingMeeting = {
     host_name: string;
 };
 
+// One meeting from GET /api/meetings/calendar: one the user hosts or has joined,
+// in any status.
+export type CalendarMeeting = {
+    _id: string;
+    meeting_code: string;
+    title: string;
+    description: string | null;
+    status: MeetingStatus;
+    scheduled_start_at: string;
+    scheduled_end_at: string | null;
+    started_at: string | null;
+    ended_at: string | null;
+    is_host: boolean;
+    host_name: string;
+};
+
 // `data` of GET /api/meetings/upcoming?page=1&limit=5
 export type UpcomingMeetingsPage = {
     page: number;

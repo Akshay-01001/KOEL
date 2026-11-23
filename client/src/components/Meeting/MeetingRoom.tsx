@@ -93,11 +93,13 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
     });
     // Bumped by "Rejoin" / "Try again" to run the join again.
     const [joinAttempt, setJoinAttempt] = useState(0);
+    // Retries while waiting for the host don't show the global loader.
+    const [isPolling, setIsPolling] = useState(false);
 
     useEffect(() => {
         const controller = new AbortController();
 
-        joinMeeting(meetingCode, guestName, controller.signal)
+        joinMeeting(meetingCode, guestName, controller.signal, isPolling)
             .then((connection) => {
                 setRoomState({ status: "connected", connection });
             })
@@ -125,13 +127,14 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
         return () => {
             controller.abort();
         };
-    }, [meetingCode, guestName, joinAttempt]);
+    }, [meetingCode, guestName, joinAttempt, isPolling]);
 
     // While waiting for the host, try joining again every few seconds. Each failed
     // try sets a fresh "waiting-for-host" state, which schedules the next one.
     useEffect(() => {
         if (roomState.status !== "waiting-for-host") return;
         const timer = setTimeout(() => {
+            setIsPolling(true);
             setJoinAttempt((attempt) => {
                 return attempt + 1;
             });
@@ -142,6 +145,7 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
     }, [roomState]);
 
     const rejoin = () => {
+        setIsPolling(false);
         setRoomState({ status: "joining" });
         setJoinAttempt((attempt) => {
             return attempt + 1;

@@ -1,5 +1,16 @@
-import axios from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 import type { ErrorResponse } from "@/api/types/response.types";
+import { store } from "@/store/store";
+import { requestFinished, requestStarted } from "@/store/slices/loaderSlice";
+
+declare module "axios" {
+    interface AxiosRequestConfig {
+        // Hide this request from the global loader (e.g. background polling).
+        skipGlobalLoader?: boolean;
+        // Set once the request is counted, so only counted ones are uncounted.
+        countedByLoader?: boolean;
+    }
+}
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_SERVER_URL,
@@ -15,6 +26,32 @@ let onUnauthorized: UnauthorizedHandler | null = null;
 export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
     onUnauthorized = handler;
 }
+
+// Global loader: count every request until it settles.
+const finishRequest = (config: AxiosRequestConfig | undefined) => {
+    if (config?.countedByLoader) store.dispatch(requestFinished());
+};
+
+api.interceptors.request.use((config) => {
+    if (!config.skipGlobalLoader) {
+        config.countedByLoader = true;
+        store.dispatch(requestStarted());
+    }
+    return config;
+});
+
+api.interceptors.response.use(
+    (response) => {
+        finishRequest(response.config);
+        return response;
+    },
+    (error) => {
+        finishRequest(
+            (error as { config?: AxiosRequestConfig } | null)?.config,
+        );
+        return Promise.reject(error);
+    },
+);
 
 // A 401 from anything but the auth endpoints means the session expired or was
 // revoked. (On /api/auth/* a 401 is expected: wrong password, or not signed in yet.)

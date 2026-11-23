@@ -181,8 +181,7 @@ export default function Navbar() {
                             </Button>
                             <Button
                                 asChild
-                                variant="outline"
-                                className="hidden h-11 border-input bg-card px-3.5 text-sm sm:inline-flex"
+                                className="hidden h-11 px-3.5 text-sm sm:inline-flex"
                             >
                                 <Link to="/register">Create account</Link>
                             </Button>

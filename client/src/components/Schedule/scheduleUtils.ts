@@ -1,4 +1,11 @@
 import type { MeetingSettings } from "@/api/types/payload.types";
+import {
+    formatDate,
+    formatTime,
+    formatTimeRange,
+    parseDate,
+    parseTime,
+} from "@/lib/dateFormat";
 
 // Same defaults the server uses when a setting isn't sent.
 export const DEFAULT_MEETING_SETTINGS: MeetingSettings = {
@@ -14,35 +21,76 @@ const SLOT_MINUTES = 30;
 const MIN_LEAD_MINUTES = 15;
 const DEFAULT_LENGTH_MINUTES = 30;
 
-const pad = (value: number) => {
-    return String(value).padStart(2, "0");
-};
-
-// "YYYY-MM-DD" in local time, the format <input type="date"> uses.
+// "DD/MM/YYYY" in local time, the format the date field uses.
 export function toDateInputValue(date: Date) {
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    return formatDate(date);
 }
 
-// "HH:MM" in local time, the format <input type="time"> uses.
+// "HH:MM" (24-hour) in local time, the format the time fields use.
 export function toTimeInputValue(date: Date) {
-    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    return formatTime(date);
 }
 
-// Turns the date and time inputs back into a local Date. Returns null if either is empty.
+// Turns the date ("DD/MM/YYYY") and time ("HH:MM") fields back into a local
+// Date. Returns null if either is empty or not a real date/time.
 export function combineDateAndTime(date: string, time: string) {
-    if (!date || !time) return null;
-    const combined = new Date(`${date}T${time}`);
-    return Number.isNaN(combined.getTime()) ? null : combined;
+    const day = parseDate(date);
+    const clock = parseTime(time);
+    if (!day || !clock) return null;
+    return new Date(
+        day.year,
+        day.month - 1,
+        day.day,
+        clock.hours,
+        clock.minutes,
+    );
 }
 
 // The next half-hour slot at least 15 minutes from now, plus a 30-minute end.
-export function getDefaultSlot(now: Date) {
+export function getDefaultSlot(now: Date): ScheduleSlot {
     const start = new Date(now.getTime() + MIN_LEAD_MINUTES * 60_000);
     const minutes = start.getMinutes();
     const roundedUp = Math.ceil(minutes / SLOT_MINUTES) * SLOT_MINUTES;
     start.setMinutes(roundedUp, 0, 0);
     const end = new Date(start.getTime() + DEFAULT_LENGTH_MINUTES * 60_000);
     return { start, end };
+}
+
+export type ScheduleSlot = {
+    start: Date;
+    end: Date | null;
+};
+
+// Where a meeting starts when a whole day is picked (month view).
+const PICKED_DAY_START_HOUR = 9;
+
+// The slot for a selection on the calendar.
+// - Week/day views: exactly the selected times, e.g. 10:00–11:30.
+// - Month view: 09:00 on the first selected day, 30 minutes long.
+// If the start has passed (or is under 15 minutes away), it moves to the next
+// free slot, keeping the selected end when that's still later.
+export function getSlotForCalendarSelection(
+    selectedStart: Date,
+    selectedEnd: Date,
+    isAllDay: boolean,
+    now: Date,
+): ScheduleSlot {
+    const start = new Date(selectedStart);
+    let end = new Date(selectedEnd);
+    if (isAllDay) {
+        start.setHours(PICKED_DAY_START_HOUR, 0, 0, 0);
+        end = new Date(start.getTime() + DEFAULT_LENGTH_MINUTES * 60_000);
+    }
+
+    if (start.getTime() >= now.getTime() + MIN_LEAD_MINUTES * 60_000) {
+        return { start, end };
+    }
+
+    const nextSlot = getDefaultSlot(now);
+    if (!isAllDay && end.getTime() > nextSlot.start.getTime()) {
+        return { start: nextSlot.start, end };
+    }
+    return nextSlot;
 }
 
 // e.g. "India Standard Time (GMT+5:30)".
@@ -60,17 +108,7 @@ export function getTimeZoneLabel(date: Date) {
     return name ?? offset ?? "";
 }
 
-// e.g. "Mon, 23 Nov · 11:00 – 11:45 AM", or without the end time.
+// e.g. "23/11/2026 · 11:00 – 11:45", or without the end time.
 export function formatMeetingTime(start: Date, end: Date | null) {
-    const day = new Intl.DateTimeFormat(undefined, {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-    }).format(start);
-    const time = new Intl.DateTimeFormat(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-    });
-    const range = end ? time.formatRange(start, end) : time.format(start);
-    return `${day} · ${range}`;
+    return `${formatDate(start)} · ${formatTimeRange(start, end)}`;
 }

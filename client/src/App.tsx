@@ -12,7 +12,7 @@ import Layout from "@/components/common/Layout";
 import SessionExpiryHandler from "@/components/common/SessionExpiryHandler";
 import Home from "@/components/Home/Home";
 import MeetingPage from "@/components/Meeting/MeetingRoom";
-import ScheduleMeeting from "@/components/Schedule/ScheduleMeeting";
+import CalendarPage from "@/components/Calendar/CalendarPage";
 import Login from "@/components/Login/Login";
 import Register from "@/components/Register/Register";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -90,10 +90,10 @@ export default function App() {
 
                 <Route element={<ProtectedRoute isLoggedIn={isLoggedIn} />}>
                     <Route
-                        path="/schedule"
+                        path="/calendar"
                         element={
                             <Layout>
-                                <ScheduleMeeting />
+                                <CalendarPage />
                             </Layout>
                         }
                     />

@@ -1,0 +1,67 @@
+/*
+ * FullCalendar's "forma" theme, coloured with Koel's tokens instead of one of its
+ * bundled palettes. The tokens switch with <html class="dark">, so this one block
+ * covers both themes. It's on :root (not the calendar wrapper) because the
+ * "+N more" popover may render outside the calendar.
+ */
+:root {
+    --fc-forma-primary: var(--primary);
+    --fc-forma-primary-over: color-mix(
+        in oklch,
+        var(--primary),
+        var(--foreground) 10%
+    );
+    --fc-forma-primary-down: color-mix(
+        in oklch,
+        var(--primary),
+        var(--foreground) 18%
+    );
+    --fc-forma-primary-foreground: var(--primary-foreground);
+
+    --fc-forma-event: var(--primary);
+    --fc-forma-event-contrast: var(--primary-foreground);
+    --fc-forma-background-event: var(--primary);
+    --fc-forma-highlight: color-mix(in oklch, var(--primary) 30%, transparent);
+
+    --fc-forma-background: var(--card);
+    --fc-forma-faint: color-mix(in oklch, var(--foreground) 3%, transparent);
+    --fc-forma-muted: color-mix(in oklch, var(--foreground) 7%, transparent);
+    --fc-forma-strong: color-mix(in oklch, var(--foreground) 12%, transparent);
+    --fc-forma-stronger: color-mix(
+        in oklch,
+        var(--foreground) 16%,
+        transparent
+    );
+    --fc-forma-strongest: color-mix(
+        in oklch,
+        var(--foreground) 20%,
+        transparent
+    );
+
+    --fc-forma-foreground: var(--foreground);
+    --fc-forma-faint-foreground: color-mix(
+        in oklch,
+        var(--muted-foreground) 70%,
+        transparent
+    );
+    --fc-forma-muted-foreground: var(--muted-foreground);
+
+    --fc-forma-border: var(--border);
+    --fc-forma-muted-border: var(--border);
+    --fc-forma-strong-border: var(--input);
+}
+
+.koel-calendar {
+    font-family: var(--font-sans);
+    font-size: 14px;
+}
+
+/* Days and times that open the schedule modal when clicked. */
+.koel-calendar .koel-clickable {
+    cursor: pointer;
+}
+
+/* Whole-day cells in the month view also tint on hover. */
+.koel-calendar .koel-clickable-day:hover {
+    background-color: color-mix(in oklch, var(--primary) 6%, transparent);
+}

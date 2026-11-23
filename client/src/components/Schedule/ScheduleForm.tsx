@@ -1,15 +1,15 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router";
 import { LoaderCircle } from "lucide-react";
 import { scheduleMeeting } from "@/api/apiFunctions";
 import { getApiErrorMessage } from "@/api/api";
 import type { MeetingSettings } from "@/api/types/payload.types";
 import type { Meeting } from "@/api/types/response.types";
+import DateField from "@/components/Schedule/DateField";
 import MoreOptions from "@/components/Schedule/MoreOptions";
 import {
     DEFAULT_MEETING_SETTINGS,
+    type ScheduleSlot,
     combineDateAndTime,
-    getDefaultSlot,
     getTimeZoneLabel,
     toDateInputValue,
     toTimeInputValue,
@@ -17,40 +17,57 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    TIME_PLACEHOLDER,
+    maskTimeInput,
+    parseDate,
+    parseTime,
+} from "@/lib/dateFormat";
 
 const TITLE_MAX_LENGTH = 120;
 const DESCRIPTION_MAX_LENGTH = 1000;
 
 type FieldErrors = {
     title?: string;
+    date?: string;
     startTime?: string;
     endTime?: string;
 };
 
 type ScheduleFormProps = {
+    // Fills in the date and times, e.g. from a slot picked on the calendar.
+    // Without it they start empty, showing DD/MM/YYYY and HH:MM.
+    initialSlot?: ScheduleSlot;
     onScheduled: (meeting: Meeting) => void;
+    onCancel: () => void;
 };
 
 const FIELD_CLASS = "h-11 bg-card px-3.5 text-[15px]";
 
 // Title, description, date and time, and meeting settings.
-export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
-    const [defaultSlot] = useState(() => {
-        return getDefaultSlot(new Date());
-    });
-
+export default function ScheduleForm({
+    initialSlot,
+    onScheduled,
+    onCancel,
+}: ScheduleFormProps) {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
-    const [date, setDate] = useState(toDateInputValue(defaultSlot.start));
-    const [startTime, setStartTime] = useState(
-        toTimeInputValue(defaultSlot.start),
-    );
-    // The end shares the start's date, so leave it empty if the default slot crosses midnight.
+    const [date, setDate] = useState(() => {
+        return initialSlot ? toDateInputValue(initialSlot.start) : "";
+    });
+    const [startTime, setStartTime] = useState(() => {
+        return initialSlot ? toTimeInputValue(initialSlot.start) : "";
+    });
+    // The end shares the start's date, so leave it empty if the slot crosses midnight.
     const [endTime, setEndTime] = useState(() => {
-        const sameDay =
-            toDateInputValue(defaultSlot.end) ===
-            toDateInputValue(defaultSlot.start);
-        return sameDay ? toTimeInputValue(defaultSlot.end) : "";
+        if (!initialSlot?.end) return "";
+        const { start, end } = initialSlot;
+        const sameDay = toDateInputValue(end) === toDateInputValue(start);
+        return sameDay ? toTimeInputValue(end) : "";
+    });
+    // Today, for the earliest day the date picker offers.
+    const [today] = useState(() => {
+        return new Date();
     });
     const [settings, setSettings] = useState<MeetingSettings>(
         DEFAULT_MEETING_SETTINGS,
@@ -75,12 +92,21 @@ export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
         const errors: FieldErrors = {};
 
         if (!title.trim()) errors.title = "Add a title";
-        if (!start) {
-            errors.startTime = "Pick a date and start time";
-        } else if (start.getTime() <= Date.now()) {
+        if (!date) {
+            errors.date = "Add a date";
+        } else if (!parseDate(date)) {
+            errors.date = "Enter the date as DD/MM/YYYY";
+        }
+        if (!startTime) {
+            errors.startTime = "Add a start time";
+        } else if (!parseTime(startTime)) {
+            errors.startTime = "Enter the start time as HH:MM (24-hour)";
+        } else if (start && start.getTime() <= Date.now()) {
             errors.startTime = "Pick a time in the future";
         }
-        if (start && end && end.getTime() <= start.getTime()) {
+        if (endTime && !parseTime(endTime)) {
+            errors.endTime = "Enter the end time as HH:MM (24-hour)";
+        } else if (start && end && end.getTime() <= start.getTime()) {
             errors.endTime = "The end time must be after the start time";
         }
 
@@ -104,7 +130,7 @@ export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
     };
 
     const timeZoneLabel = getTimeZoneLabel(
-        combineDateAndTime(date, startTime) ?? defaultSlot.start,
+        combineDateAndTime(date, startTime) ?? today,
     );
 
     return (
@@ -113,7 +139,7 @@ export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
             onSubmit={(event) => {
                 void handleSubmit(event);
             }}
-            className="flex flex-col gap-[22px] rounded-2xl border border-border bg-card p-5 sm:p-8"
+            className="flex flex-col gap-[22px]"
         >
             <div className="flex flex-col gap-1.5">
                 <Label htmlFor="title">Title</Label>
@@ -167,13 +193,17 @@ export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3.5">
                     <div className="flex flex-col gap-1.5">
                         <Label htmlFor="date">Date</Label>
-                        <Input
+                        <DateField
                             id="date"
-                            type="date"
-                            min={toDateInputValue(new Date())}
+                            min={today}
                             value={date}
-                            onChange={(event) => {
-                                setDate(event.target.value);
+                            aria-invalid={fieldErrors.date ? true : undefined}
+                            aria-describedby={
+                                fieldErrors.date ? "date-error" : undefined
+                            }
+                            onValueChange={(value) => {
+                                setDate(value);
+                                clearFieldError("date");
                                 clearFieldError("startTime");
                                 clearFieldError("endTime");
                             }}
@@ -184,8 +214,11 @@ export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
                         <Label htmlFor="start-time">Starts</Label>
                         <Input
                             id="start-time"
-                            type="time"
-                            step={300}
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            placeholder={TIME_PLACEHOLDER}
+                            maxLength={TIME_PLACEHOLDER.length}
                             value={startTime}
                             aria-invalid={
                                 fieldErrors.startTime ? true : undefined
@@ -196,7 +229,7 @@ export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
                                     : undefined
                             }
                             onChange={(event) => {
-                                setStartTime(event.target.value);
+                                setStartTime(maskTimeInput(event.target.value));
                                 clearFieldError("startTime");
                                 clearFieldError("endTime");
                             }}
@@ -212,8 +245,11 @@ export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
                         </Label>
                         <Input
                             id="end-time"
-                            type="time"
-                            step={300}
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            placeholder={TIME_PLACEHOLDER}
+                            maxLength={TIME_PLACEHOLDER.length}
                             value={endTime}
                             aria-invalid={
                                 fieldErrors.endTime ? true : undefined
@@ -224,13 +260,18 @@ export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
                                     : undefined
                             }
                             onChange={(event) => {
-                                setEndTime(event.target.value);
+                                setEndTime(maskTimeInput(event.target.value));
                                 clearFieldError("endTime");
                             }}
                             className={FIELD_CLASS}
                         />
                     </div>
                 </div>
+                {fieldErrors.date && (
+                    <p id="date-error" className="text-[13px] text-destructive">
+                        {fieldErrors.date}
+                    </p>
+                )}
                 {fieldErrors.startTime && (
                     <p
                         id="start-time-error"
@@ -274,11 +315,12 @@ export default function ScheduleForm({ onScheduled }: ScheduleFormProps) {
 
             <div className="flex flex-wrap justify-end gap-2.5 border-t border-border pt-[22px]">
                 <Button
-                    asChild
+                    type="button"
                     variant="ghost"
+                    onClick={onCancel}
                     className="h-11 px-[18px] text-[15px]"
                 >
-                    <Link to="/">Cancel</Link>
+                    Cancel
                 </Button>
                 <Button
                     type="submit"

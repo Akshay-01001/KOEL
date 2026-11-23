@@ -1,3 +1,4 @@
+import GuestShowcase from "@/components/Home/GuestShowcase";
 import GuestStartCard from "@/components/Home/GuestStartCard";
 import JoinMeetingCard from "@/components/Home/JoinMeetingCard";
 import NewMeetingCard from "@/components/Home/NewMeetingCard";
@@ -12,7 +13,7 @@ function getGreeting(date: Date) {
 }
 
 // Landing page. Signed-in users get the greeting, start/join cards, and their
-// upcoming meetings; guests can only join a meeting with a code.
+// upcoming meetings; guests can join with a code and see what Koel offers.
 export default function Home() {
     const user = useAppSelector((state) => {
         return state.user.user;
@@ -46,7 +47,7 @@ export default function Home() {
                 )}
             </section>
 
-            {user && <UpcomingSection />}
+            {user ? <UpcomingSection /> : <GuestShowcase />}
         </div>
     );
 }

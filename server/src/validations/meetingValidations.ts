@@ -64,6 +64,25 @@ export const upcomingMeetingsQuerySchema = Joi.object<UpcomingMeetingsQuery>({
         .default(UPCOMING_PAGE_SIZE),
 }).options({ abortEarly: false, stripUnknown: true });
 
+export type CalendarMeetingsQuery = {
+    from: Date;
+    to: Date;
+};
+
+// The longest range one calendar request may ask for. A month view with its
+// leading and trailing weeks is 42 days; this leaves room for longer views.
+export const CALENDAR_MAX_RANGE_DAYS = 100;
+
+// GET /api/meetings/calendar?from=<ISO>&to=<ISO> — the range the calendar shows.
+export const calendarMeetingsQuerySchema = Joi.object<CalendarMeetingsQuery>({
+    from: Joi.date().iso().required(),
+    to: Joi.date()
+        .iso()
+        .greater(Joi.ref("from"))
+        .required()
+        .messages({ "date.greater": "to must be after from" }),
+}).options({ abortEarly: false, stripUnknown: true });
+
 export type JoinMeetingBody = {
     // Only used for guests; signed-in users join under their account name.
     guest_name?: string;

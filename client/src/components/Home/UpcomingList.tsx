@@ -1,19 +1,20 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { Calendar, CircleAlert, LoaderCircle } from "lucide-react";
 import { startMeeting } from "@/api/apiFunctions";
 import { getApiErrorMessage } from "@/api/api";
 import type { UpcomingMeeting } from "@/api/types/response.types";
 import EmptyState from "@/components/Home/EmptyState";
 import UpcomingMeetingRow from "@/components/Home/UpcomingMeetingRow";
-import type { UpcomingMeetingsState } from "@/components/Home/useUpcomingMeetings";
+import type { UpcomingState } from "@/store/slices/upcomingSlice";
 import { Button } from "@/components/ui/button";
 import { getMeetingPath } from "@/lib/meetingCode";
 
 type UpcomingListProps = {
-    state: UpcomingMeetingsState;
+    state: UpcomingState;
     onRetry: () => void;
     onLoadMore: () => void;
+    onSchedule: () => void;
 };
 
 // Re-render this often so "Starts in N min" stays current.
@@ -27,6 +28,7 @@ export default function UpcomingList({
     state,
     onRetry,
     onLoadMore,
+    onSchedule,
 }: UpcomingListProps) {
     const navigate = useNavigate();
     const [now, setNow] = useState(() => {
@@ -66,7 +68,7 @@ export default function UpcomingList({
         navigate(getMeetingPath(meeting.meeting_code));
     };
 
-    if (state.status === "loading") {
+    if (state.status === "idle" || state.status === "loading") {
         return (
             <div
                 role="status"
@@ -83,7 +85,7 @@ export default function UpcomingList({
             <EmptyState
                 icon={<CircleAlert className="size-8" strokeWidth={1.75} />}
                 title="Couldn’t load your meetings"
-                description={state.message}
+                description={state.error ?? "Something went wrong."}
                 action={
                     <Button
                         type="button"
@@ -106,11 +108,12 @@ export default function UpcomingList({
                 description="Plan a meeting for later, or start one now and share the link."
                 action={
                     <Button
-                        asChild
+                        type="button"
                         variant="outline"
+                        onClick={onSchedule}
                         className={OUTLINE_BUTTON_CLASS}
                     >
-                        <Link to="/schedule">Schedule a meeting</Link>
+                        Schedule a meeting
                     </Button>
                 }
             />

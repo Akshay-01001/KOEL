@@ -6,7 +6,10 @@ import {
     MeetingStatus,
     type MeetingDocument,
 } from "../models/meeting.model.js";
-import { ParticipantRole } from "../models/meeting.participant.model.js";
+import {
+    MeetingParticipantModel,
+    ParticipantRole,
+} from "../models/meeting.participant.model.js";
 import {
     closeMeetingRoom,
     closeOpenSessions,
@@ -19,6 +22,8 @@ import {
     recordJoin,
 } from "../utils/functions.js";
 import {
+    CALENDAR_MAX_RANGE_DAYS,
+    calendarMeetingsQuerySchema,
     createMeetingSchema,
     joinMeetingSchema,
     leaveMeetingSchema,
@@ -32,6 +37,9 @@ const NO_END_TIME_GRACE_MS = 60 * 60 * 1000;
 // A meeting still "running" after this long was most likely abandoned (the host
 // closed the tab instead of pressing Leave), so it's left off the list.
 const STALE_RUNNING_MS = 12 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Safety cap on one calendar response.
+const CALENDAR_MAX_MEETINGS = 500;
 
 const findMeetingFromParams = async (req: Request, res: Response) => {
     const { meetingId } = req.params;
@@ -360,5 +368,83 @@ export const getUpcomingMeetings = async (req: Request, res: Response) => {
     } catch (error) {
         console.error("Failed to list upcoming meetings:", error);
         return sendResponse(res, 500, "Failed to load upcoming meetings");
+    }
+};
+
+// Meetings shown on the calendar between ?from and ?to (ISO dates): the ones the
+// user hosts plus the ones they've joined, in any status, soonest first.
+// A meeting is included if any part of it falls inside the range; one without
+// an end time counts as a moment at its start.
+export const getCalendarMeetings = async (req: Request, res: Response) => {
+    const { value: query, error: queryError } =
+        calendarMeetingsQuerySchema.validate(req.query);
+    if (queryError) {
+        return sendValidationError(res, "Invalid query", queryError.details);
+    }
+    const { from, to } = query;
+    if (to.getTime() - from.getTime() > CALENDAR_MAX_RANGE_DAYS * DAY_MS) {
+        return sendResponse(
+            res,
+            400,
+            `The range can be at most ${CALENDAR_MAX_RANGE_DAYS} days`,
+        );
+    }
+
+    try {
+        const joinedMeetingIds = await MeetingParticipantModel.distinct(
+            "meeting_id",
+            { user_id: req.userId },
+        );
+
+        const meetings = await MeetingModel.find({
+            $and: [
+                {
+                    $or: [
+                        { host_id: req.userId },
+                        { _id: { $in: joinedMeetingIds } },
+                    ],
+                },
+                { scheduled_start_at: { $lt: to } },
+                {
+                    $or: [
+                        { scheduled_end_at: { $gt: from } },
+                        {
+                            scheduled_end_at: null,
+                            scheduled_start_at: { $gte: from },
+                        },
+                    ],
+                },
+            ],
+        })
+            .sort({ scheduled_start_at: 1, _id: 1 })
+            .limit(CALENDAR_MAX_MEETINGS)
+            .populate<{
+                host_id: { _id: Types.ObjectId; name: string } | null;
+            }>("host_id", "name");
+
+        return sendResponse(
+            res,
+            200,
+            "Calendar meetings",
+            meetings.map((meeting) => {
+                const host = meeting.host_id;
+                return {
+                    _id: meeting._id,
+                    meeting_code: meeting.meeting_code,
+                    title: meeting.title,
+                    description: meeting.description,
+                    status: meeting.status,
+                    scheduled_start_at: meeting.scheduled_start_at,
+                    scheduled_end_at: meeting.scheduled_end_at,
+                    started_at: meeting.started_at,
+                    ended_at: meeting.ended_at,
+                    is_host: host ? host._id.equals(req.userId) : false,
+                    host_name: host?.name ?? "Unknown host",
+                };
+            }),
+        );
+    } catch (error) {
+        console.error("Failed to list calendar meetings:", error);
+        return sendResponse(res, 500, "Failed to load calendar meetings");
     }
 };

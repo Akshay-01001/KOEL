@@ -1,21 +1,14 @@
 import type { UpcomingMeeting } from "@/api/types/response.types";
+import {
+    formatDate,
+    formatTime,
+    formatTimeRange,
+    isSameDay,
+} from "@/lib/dateFormat";
 
 const MINUTE_MS = 60_000;
 // Show "Starts in N min" when a meeting is this close.
 const SOON_WINDOW_MINUTES = 60;
-
-const isSameDay = (a: Date, b: Date) => {
-    return (
-        a.getFullYear() === b.getFullYear() &&
-        a.getMonth() === b.getMonth() &&
-        a.getDate() === b.getDate()
-    );
-};
-
-const timeFormat = new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-});
 
 // "SUN" and "22" for the date block on the left of each row.
 export function getDateBlock(date: Date) {
@@ -27,11 +20,11 @@ export function getDateBlock(date: Date) {
     };
 }
 
-// "Today, 8:30 – 9:15 PM", "Tomorrow, 11:00 AM", "Wed, 25 Nov, 4:00 – 4:30 PM",
-// or "Started 8:31 PM" for a meeting that's live.
+// "Today, 20:30 – 21:15", "Tomorrow, 11:00", "25/11/2026, 16:00 – 16:30",
+// or "Started 20:31" for a meeting that's live.
 export function getWhenText(meeting: UpcomingMeeting, now: Date) {
     if (meeting.status === "running" && meeting.started_at) {
-        return `Started ${timeFormat.format(new Date(meeting.started_at))}`;
+        return `Started ${formatTime(new Date(meeting.started_at))}`;
     }
 
     const start = new Date(meeting.scheduled_start_at);
@@ -47,17 +40,10 @@ export function getWhenText(meeting: UpcomingMeeting, now: Date) {
     } else if (isSameDay(start, tomorrow)) {
         day = "Tomorrow";
     } else {
-        day = new Intl.DateTimeFormat(undefined, {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-        }).format(start);
+        day = formatDate(start);
     }
 
-    const time = end
-        ? timeFormat.formatRange(start, end)
-        : timeFormat.format(start);
-    return `${day}, ${time}`;
+    return `${day}, ${formatTimeRange(start, end)}`;
 }
 
 // The small badge next to the title, if any.
