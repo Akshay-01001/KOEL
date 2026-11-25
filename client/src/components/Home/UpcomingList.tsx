@@ -15,6 +15,9 @@ type UpcomingListProps = {
     onRetry: () => void;
     onLoadMore: () => void;
     onSchedule: () => void;
+    // The host picked Edit or Cancel in a scheduled meeting's row menu.
+    onEdit: (meeting: UpcomingMeeting) => void;
+    onCancel: (meeting: UpcomingMeeting) => void;
 };
 
 // Re-render this often so "Starts in N min" stays current.
@@ -22,13 +25,16 @@ const CLOCK_TICK_MS = 30_000;
 
 const OUTLINE_BUTTON_CLASS = "h-11 border-input bg-card px-[18px] text-[15px]";
 
-// The user's upcoming meetings, each with its code, a copy-link button, and Start/Join,
-// plus "Show more" while there are more pages.
+// The user's upcoming meetings, each with its code, a copy-link button, Start/Join,
+// and for the host's scheduled ones a menu to edit or cancel, plus "Show more"
+// while there are more pages.
 export default function UpcomingList({
     state,
     onRetry,
     onLoadMore,
     onSchedule,
+    onEdit,
+    onCancel,
 }: UpcomingListProps) {
     const navigate = useNavigate();
     const [now, setNow] = useState(() => {
@@ -139,6 +145,12 @@ export default function UpcomingList({
                             }
                             onStart={() => {
                                 void handleStart(meeting);
+                            }}
+                            onEdit={() => {
+                                onEdit(meeting);
+                            }}
+                            onCancel={() => {
+                                onCancel(meeting);
                             }}
                         />
                     );

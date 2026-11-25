@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getMeetingLink } from "@/lib/meetingCode";
@@ -6,6 +6,8 @@ import { getMeetingLink } from "@/lib/meetingCode";
 type MeetingHeaderProps = {
     title: string;
     meetingCode: string;
+    // Extra controls after the copy button, e.g. the host's "End for everyone".
+    children?: ReactNode;
 };
 
 const COPIED_RESET_MS = 2000;
@@ -15,6 +17,7 @@ const COPIED_RESET_MS = 2000;
 export default function MeetingHeader({
     title,
     meetingCode,
+    children,
 }: MeetingHeaderProps) {
     const [isCopied, setIsCopied] = useState(false);
 
@@ -60,6 +63,7 @@ export default function MeetingHeader({
                 <span className="sr-only" aria-live="polite">
                     {isCopied ? "Meeting link copied" : ""}
                 </span>
+                {children}
             </div>
         </header>
     );

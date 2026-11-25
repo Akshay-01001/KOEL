@@ -211,15 +211,37 @@
     background-color: oklch(0.28 0.045 264);
 }
 
-.koel-figure[data-person="riya"] { --figure: var(--figure-riya); --tile: var(--tile-riya); }
-.koel-figure[data-person="arjun"] { --figure: var(--figure-arjun); --tile: var(--tile-arjun); }
-.koel-figure[data-person="sara"] { --figure: var(--figure-sara); --tile: var(--tile-sara); }
-.koel-figure[data-person="kabir"] { --figure: var(--figure-kabir); --tile: var(--tile-kabir); }
-.koel-figure[data-person="neha"] { --figure: var(--figure-neha); --tile: var(--tile-neha); }
-.koel-figure[data-person="dev"] { --figure: var(--figure-dev); --tile: var(--tile-dev); }
+.koel-figure[data-person="riya"] {
+    --figure: var(--figure-riya);
+    --tile: var(--tile-riya);
+}
+.koel-figure[data-person="arjun"] {
+    --figure: var(--figure-arjun);
+    --tile: var(--tile-arjun);
+}
+.koel-figure[data-person="sara"] {
+    --figure: var(--figure-sara);
+    --tile: var(--tile-sara);
+}
+.koel-figure[data-person="kabir"] {
+    --figure: var(--figure-kabir);
+    --tile: var(--tile-kabir);
+}
+.koel-figure[data-person="neha"] {
+    --figure: var(--figure-neha);
+    --tile: var(--tile-neha);
+}
+.koel-figure[data-person="dev"] {
+    --figure: var(--figure-dev);
+    --tile: var(--tile-dev);
+}
 
-.video-tile { background: var(--tile, var(--tile-riya)); }
-.koel-figure { background: transparent; }
+.video-tile {
+    background: var(--tile, var(--tile-riya));
+}
+.koel-figure {
+    background: transparent;
+}
 .koel-figure-head {
     position: absolute;
     left: 50%;

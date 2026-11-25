@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { LoaderCircle } from "lucide-react";
-import { scheduleMeeting } from "@/api/apiFunctions";
+import { scheduleMeeting, updateMeeting } from "@/api/apiFunctions";
 import { getApiErrorMessage } from "@/api/api";
 import type { MeetingSettings } from "@/api/types/payload.types";
-import type { Meeting } from "@/api/types/response.types";
+import type { EditableMeeting, Meeting } from "@/api/types/response.types";
 import DateField from "@/components/Schedule/DateField";
 import MoreOptions from "@/components/Schedule/MoreOptions";
 import {
@@ -38,20 +38,43 @@ type ScheduleFormProps = {
     // Fills in the date and times, e.g. from a slot picked on the calendar.
     // Without it they start empty, showing DD/MM/YYYY and HH:MM.
     initialSlot?: ScheduleSlot;
-    onScheduled: (meeting: Meeting) => void;
+    // Edit mode: the form starts with this meeting's details and saves changes
+    // to it instead of scheduling a new one.
+    meeting?: EditableMeeting;
+    onSaved: (meeting: Meeting) => void;
     onCancel: () => void;
 };
 
+// The date and times the form starts with: the meeting being edited, else the
+// picked slot, else nothing.
+function getInitialSlot(meeting?: EditableMeeting, slot?: ScheduleSlot) {
+    if (meeting) {
+        return {
+            start: new Date(meeting.scheduled_start_at),
+            end: meeting.scheduled_end_at
+                ? new Date(meeting.scheduled_end_at)
+                : null,
+        };
+    }
+    return slot;
+}
+
 const FIELD_CLASS = "h-11 bg-card px-3.5 text-[15px]";
 
-// Title, description, date and time, and meeting settings.
+// Title, description, date and time, and meeting settings. Schedules a new
+// meeting, or with `meeting` edits that one.
 export default function ScheduleForm({
-    initialSlot,
-    onScheduled,
+    initialSlot: slot,
+    meeting,
+    onSaved,
     onCancel,
 }: ScheduleFormProps) {
-    const [title, setTitle] = useState("");
-    const [description, setDescription] = useState("");
+    const isEditing = meeting !== undefined;
+    const [initialSlot] = useState(() => {
+        return getInitialSlot(meeting, slot);
+    });
+    const [title, setTitle] = useState(meeting?.title ?? "");
+    const [description, setDescription] = useState(meeting?.description ?? "");
     const [date, setDate] = useState(() => {
         return initialSlot ? toDateInputValue(initialSlot.start) : "";
     });
@@ -69,9 +92,9 @@ export default function ScheduleForm({
     const [today] = useState(() => {
         return new Date();
     });
-    const [settings, setSettings] = useState<MeetingSettings>(
-        DEFAULT_MEETING_SETTINGS,
-    );
+    const [settings, setSettings] = useState<MeetingSettings>(() => {
+        return { ...DEFAULT_MEETING_SETTINGS, ...meeting?.settings };
+    });
 
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
     const [formError, setFormError] = useState<string | null>(null);
@@ -89,6 +112,10 @@ export default function ScheduleForm({
 
         const start = combineDateAndTime(date, startTime);
         const end = endTime ? combineDateAndTime(date, endTime) : null;
+        // When editing, an unchanged start may already have passed (a meeting
+        // that wasn't started on time); only a new start must be in the future.
+        const isStartChanged =
+            !isEditing || start?.getTime() !== initialSlot?.start.getTime();
         const errors: FieldErrors = {};
 
         if (!title.trim()) errors.title = "Add a title";
@@ -101,7 +128,7 @@ export default function ScheduleForm({
             errors.startTime = "Add a start time";
         } else if (!parseTime(startTime)) {
             errors.startTime = "Enter the start time as HH:MM (24-hour)";
-        } else if (start && start.getTime() <= Date.now()) {
+        } else if (isStartChanged && start && start.getTime() <= Date.now()) {
             errors.startTime = "Pick a time in the future";
         }
         if (endTime && !parseTime(endTime)) {
@@ -115,14 +142,24 @@ export default function ScheduleForm({
 
         setIsSubmitting(true);
         try {
-            const meeting = await scheduleMeeting({
-                title: title.trim(),
-                description: description.trim() || undefined,
-                scheduled_start_at: start.toISOString(),
-                scheduled_end_at: end?.toISOString(),
-                settings,
-            });
-            onScheduled(meeting);
+            const saved = meeting
+                ? await updateMeeting(meeting._id, {
+                      title: title.trim(),
+                      description: description.trim() || null,
+                      ...(isStartChanged && {
+                          scheduled_start_at: start.toISOString(),
+                      }),
+                      scheduled_end_at: end?.toISOString() ?? null,
+                      settings,
+                  })
+                : await scheduleMeeting({
+                      title: title.trim(),
+                      description: description.trim() || undefined,
+                      scheduled_start_at: start.toISOString(),
+                      scheduled_end_at: end?.toISOString(),
+                      settings,
+                  });
+            onSaved(saved);
         } catch (error) {
             setFormError(getApiErrorMessage(error));
             setIsSubmitting(false);
@@ -330,7 +367,13 @@ export default function ScheduleForm({
                     {isSubmitting && (
                         <LoaderCircle className="motion-safe:animate-spin" />
                     )}
-                    {isSubmitting ? "Scheduling…" : "Schedule meeting"}
+                    {isEditing
+                        ? isSubmitting
+                            ? "Saving…"
+                            : "Save changes"
+                        : isSubmitting
+                          ? "Scheduling…"
+                          : "Schedule meeting"}
                 </Button>
             </div>
         </form>

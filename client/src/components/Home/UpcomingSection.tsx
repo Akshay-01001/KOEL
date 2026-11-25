@@ -3,7 +3,9 @@ import { Link } from "react-router";
 import { CalendarDays } from "lucide-react";
 import { getUpcomingMeetings } from "@/api/apiFunctions";
 import { getApiErrorMessage } from "@/api/api";
+import type { UpcomingMeeting } from "@/api/types/response.types";
 import UpcomingList from "@/components/Home/UpcomingList";
+import CancelMeetingDialog from "@/components/Schedule/CancelMeetingDialog";
 import ScheduleMeetingDialog from "@/components/Schedule/ScheduleMeetingDialog";
 import { Button } from "@/components/ui/button";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -24,8 +26,16 @@ export default function UpcomingSection() {
     const dispatch = useAppDispatch();
     const upcoming = useAppSelector(selectUpcoming);
     const loadMoreController = useRef<AbortController | null>(null);
-    // Lives here, not in the list, so it stays open while the list reloads.
+    // The dialogs live here, not in the list, so they stay open while the
+    // list reloads. The meetings are kept after closing so the dialogs don't
+    // go blank while they fade out.
     const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+    const [editingMeeting, setEditingMeeting] =
+        useState<UpcomingMeeting | null>(null);
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [cancellingMeeting, setCancellingMeeting] =
+        useState<UpcomingMeeting | null>(null);
+    const [isCancelOpen, setIsCancelOpen] = useState(false);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -110,10 +120,28 @@ export default function UpcomingSection() {
                 onSchedule={() => {
                     setIsScheduleOpen(true);
                 }}
+                onEdit={(meeting) => {
+                    setEditingMeeting(meeting);
+                    setIsEditOpen(true);
+                }}
+                onCancel={(meeting) => {
+                    setCancellingMeeting(meeting);
+                    setIsCancelOpen(true);
+                }}
             />
             <ScheduleMeetingDialog
                 open={isScheduleOpen}
                 onOpenChange={setIsScheduleOpen}
+            />
+            <ScheduleMeetingDialog
+                open={isEditOpen && editingMeeting !== null}
+                onOpenChange={setIsEditOpen}
+                meeting={editingMeeting ?? undefined}
+            />
+            <CancelMeetingDialog
+                open={isCancelOpen}
+                onOpenChange={setIsCancelOpen}
+                meeting={cancellingMeeting}
             />
         </section>
     );

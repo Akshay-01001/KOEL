@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
     CalendarDays,
+    CalendarX,
     Check,
     Copy,
     LoaderCircle,
+    Pencil,
     UserRound,
 } from "lucide-react";
 import { startMeeting } from "@/api/apiFunctions";
@@ -47,11 +49,18 @@ const STATUS_BADGES: Record<
 
 type MeetingDialogBodyProps = {
     meeting: CalendarMeeting;
+    onEdit: () => void;
+    onCancel: () => void;
 };
 
 // The modal's contents for one meeting: when, who hosts, the code with a copy
 // button, and Start (host, not started yet) or Join while it can be joined.
-function MeetingDialogBody({ meeting }: MeetingDialogBodyProps) {
+// The host of a scheduled meeting can also edit or cancel it.
+function MeetingDialogBody({
+    meeting,
+    onEdit,
+    onCancel,
+}: MeetingDialogBodyProps) {
     const navigate = useNavigate();
     const [isCopied, setIsCopied] = useState(false);
     const [isStarting, setIsStarting] = useState(false);
@@ -194,6 +203,33 @@ function MeetingDialogBody({ meeting }: MeetingDialogBodyProps) {
             )}
 
             <div className="flex flex-wrap justify-end gap-2.5 border-t border-border pt-5">
+                {isHostStart && (
+                    <div className="mr-auto flex flex-wrap gap-1">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={isStarting}
+                            onClick={onEdit}
+                            className={cn(BUTTON_CLASS, "px-3.5")}
+                        >
+                            <Pencil />
+                            Edit
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={isStarting}
+                            onClick={onCancel}
+                            className={cn(
+                                BUTTON_CLASS,
+                                "px-3.5 text-destructive hover:text-destructive",
+                            )}
+                        >
+                            <CalendarX />
+                            Cancel meeting
+                        </Button>
+                    </div>
+                )}
                 <DialogClose asChild>
                     <Button
                         type="button"
@@ -229,19 +265,34 @@ type MeetingDialogProps = {
     // The meeting clicked on the calendar. Kept after closing so the modal
     // doesn't go blank while it fades out.
     meeting: CalendarMeeting | null;
+    // The host picked Edit or Cancel meeting; the caller opens that dialog.
+    onEdit: (meeting: CalendarMeeting) => void;
+    onCancel: (meeting: CalendarMeeting) => void;
 };
 
-// Opens when a meeting is clicked on the calendar, to start or join it.
+// Opens when a meeting is clicked on the calendar, to start or join it, or for
+// the host of a scheduled one, to edit or cancel it.
 export default function MeetingDialog({
     open,
     onOpenChange,
     meeting,
+    onEdit,
+    onCancel,
 }: MeetingDialogProps) {
     return (
         <Dialog open={open && meeting !== null} onOpenChange={onOpenChange}>
             <DialogContent className="gap-5 bg-card p-5 text-card-foreground sm:max-w-[460px] sm:p-7">
                 {meeting && (
-                    <MeetingDialogBody key={meeting._id} meeting={meeting} />
+                    <MeetingDialogBody
+                        key={meeting._id}
+                        meeting={meeting}
+                        onEdit={() => {
+                            onEdit(meeting);
+                        }}
+                        onCancel={() => {
+                            onCancel(meeting);
+                        }}
+                    />
                 )}
             </DialogContent>
         </Dialog>

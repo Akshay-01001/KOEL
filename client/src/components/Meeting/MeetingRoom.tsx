@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import axios from "axios";
 import { LiveKitRoom, VideoConference } from "@livekit/components-react";
@@ -11,12 +11,18 @@ import {
     LogOut,
     PhoneOff,
 } from "lucide-react";
-import { joinMeeting, leaveMeeting, startMeeting } from "@/api/apiFunctions";
+import {
+    endMeeting,
+    joinMeeting,
+    leaveMeeting,
+    startMeeting,
+} from "@/api/apiFunctions";
 import { getApiErrorMessage } from "@/api/api";
 import type {
     ErrorResponse,
     JoinMeetingData,
 } from "@/api/types/response.types";
+import EndMeetingButton from "@/components/Meeting/EndMeetingButton";
 import GuestPreJoin from "@/components/Meeting/GuestPreJoin";
 import MeetingHeader from "@/components/Meeting/MeetingHeader";
 import MeetingStatusScreen from "@/components/Meeting/MeetingStatusScreen";
@@ -37,7 +43,8 @@ type RoomState =
           error?: string;
       }
     | { status: "connected"; connection: JoinMeetingData }
-    | { status: "left" }
+    // Leaving never ends the meeting, not even for the host.
+    | { status: "left"; isHost: boolean }
     | { status: "ended-by-you" }
     | { status: "ended-by-host" }
     | { status: "error"; message: string };
@@ -85,7 +92,7 @@ type MeetingRoomProps = {
 
 // Joins the meeting on the server, then connects to its LiveKit room with mic and
 // camera on. LiveKit's prebuilt VideoConference gives the grid, controls, chat,
-// screen share, and the Leave button.
+// screen share, and the Leave button; the host also gets "End for everyone".
 function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
     const isGuest = guestName !== undefined;
     const [roomState, setRoomState] = useState<RoomState>({
@@ -95,6 +102,9 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
     const [joinAttempt, setJoinAttempt] = useState(0);
     // Retries while waiting for the host don't show the global loader.
     const [isPolling, setIsPolling] = useState(false);
+    // Set while the host is ending the meeting, so the disconnect that follows
+    // (the server deletes the room) shows "You ended the meeting".
+    const isEndingRef = useRef(false);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -145,6 +155,7 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
     }, [roomState]);
 
     const rejoin = () => {
+        isEndingRef.current = false;
         setIsPolling(false);
         setRoomState({ status: "joining" });
         setJoinAttempt((attempt) => {
@@ -229,6 +240,11 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
             <MeetingStatusScreen
                 icon={<LogOut className="size-8" strokeWidth={1.75} />}
                 title="You left the meeting"
+                description={
+                    roomState.isHost
+                        ? "The meeting is still running for everyone else. Rejoin any time."
+                        : undefined
+                }
                 actions={
                     <>
                         <Button
@@ -292,9 +308,24 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
     const { connection } = roomState;
     const isHost = connection.role === "host";
 
+    const handleEndMeeting = async () => {
+        isEndingRef.current = true;
+        try {
+            await endMeeting(connection.meeting._id);
+        } catch (error) {
+            isEndingRef.current = false;
+            throw error;
+        }
+        setRoomState({ status: "ended-by-you" });
+    };
+
     const handleDisconnected = (reason?: DisconnectReason) => {
+        if (isEndingRef.current) {
+            setRoomState({ status: "ended-by-you" });
+            return;
+        }
         if (reason === DisconnectReason.CLIENT_INITIATED) {
-            // The user pressed Leave. For the host the server ends the meeting for everyone.
+            // The user pressed Leave; the meeting keeps running without them.
             leaveMeeting(connection.meeting._id, connection.guest_id).catch(
                 (error) => {
                     console.warn(
@@ -303,7 +334,7 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
                     );
                 },
             );
-            setRoomState({ status: isHost ? "ended-by-you" : "left" });
+            setRoomState({ status: "left", isHost });
             return;
         }
         if (reason === DisconnectReason.ROOM_DELETED) {
@@ -357,7 +388,11 @@ function MeetingRoom({ meetingCode, guestName }: MeetingRoomProps) {
                 <MeetingHeader
                     title={connection.meeting.title}
                     meetingCode={connection.meeting.meeting_code}
-                />
+                >
+                    {isHost && (
+                        <EndMeetingButton onConfirm={handleEndMeeting} />
+                    )}
+                </MeetingHeader>
                 <div className="min-h-0 flex-1">
                     <VideoConference />
                 </div>

@@ -23,6 +23,7 @@ import { getApiErrorMessage } from "@/api/api";
 import type { CalendarMeeting } from "@/api/types/response.types";
 import CalendarToolbar from "@/components/Calendar/CalendarToolbar";
 import MeetingDialog from "@/components/Calendar/MeetingDialog";
+import CancelMeetingDialog from "@/components/Schedule/CancelMeetingDialog";
 import ScheduleMeetingDialog from "@/components/Schedule/ScheduleMeetingDialog";
 import {
     type ScheduleSlot,
@@ -184,7 +185,8 @@ function getEventEnd(meeting: CalendarMeeting) {
 }
 
 // /calendar: the signed-in user's meetings by month, week, or day, filling the
-// page below the navbar. Clicking a meeting opens it to start or join; clicking
+// page below the navbar. Clicking a meeting opens it to start or join (and for
+// the host of a scheduled one, edit or cancel); clicking
 // a day or time opens the schedule modal for that slot. Meetings are loaded
 // for whatever range is on screen, each time it changes.
 export default function CalendarPage() {
@@ -240,6 +242,10 @@ export default function CalendarPage() {
         undefined,
     );
     const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+    // Edit and Cancel open from the meeting modal, which closes first. Both act
+    // on selectedMeeting.
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isCancelOpen, setIsCancelOpen] = useState(false);
 
     const events = useMemo<EventInput[]>(() => {
         return meetings.map((meeting) => {
@@ -413,6 +419,24 @@ export default function CalendarPage() {
             <MeetingDialog
                 open={isMeetingOpen}
                 onOpenChange={setIsMeetingOpen}
+                meeting={selectedMeeting}
+                onEdit={() => {
+                    setIsMeetingOpen(false);
+                    setIsEditOpen(true);
+                }}
+                onCancel={() => {
+                    setIsMeetingOpen(false);
+                    setIsCancelOpen(true);
+                }}
+            />
+            <ScheduleMeetingDialog
+                open={isEditOpen && selectedMeeting !== null}
+                onOpenChange={setIsEditOpen}
+                meeting={selectedMeeting ?? undefined}
+            />
+            <CancelMeetingDialog
+                open={isCancelOpen}
+                onOpenChange={setIsCancelOpen}
                 meeting={selectedMeeting}
             />
             <ScheduleMeetingDialog

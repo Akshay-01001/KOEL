@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Meeting } from "@/api/types/response.types";
+import type { EditableMeeting, Meeting } from "@/api/types/response.types";
 import ScheduleForm from "@/components/Schedule/ScheduleForm";
 import ScheduledConfirmation from "@/components/Schedule/ScheduledConfirmation";
 import type { ScheduleSlot } from "@/components/Schedule/scheduleUtils";
@@ -20,6 +20,9 @@ type ScheduleMeetingDialogProps = {
     // Fills in the date and times (e.g. a slot picked on the calendar); without
     // it they start empty.
     initialSlot?: ScheduleSlot;
+    // Edit mode: change this meeting instead of scheduling a new one. The modal
+    // closes once the changes are saved.
+    meeting?: EditableMeeting;
     // Called as soon as the meeting is saved. The upcoming list and calendar
     // refresh on their own; this is for anything else that needs to know.
     onScheduled?: (meeting: Meeting) => void;
@@ -27,6 +30,7 @@ type ScheduleMeetingDialogProps = {
 
 type ScheduleDialogBodyProps = {
     initialSlot?: ScheduleSlot;
+    meeting?: EditableMeeting;
     onScheduled?: (meeting: Meeting) => void;
     onClose: () => void;
 };
@@ -35,6 +39,7 @@ type ScheduleDialogBodyProps = {
 // Radix unmounts this on close, so every open starts with a fresh form.
 function ScheduleDialogBody({
     initialSlot,
+    meeting,
     onScheduled,
     onClose,
 }: ScheduleDialogBodyProps) {
@@ -59,20 +64,27 @@ function ScheduleDialogBody({
         <>
             <DialogHeader className="pr-10">
                 <DialogTitle className="font-display text-2xl leading-tight font-semibold tracking-[-0.01em]">
-                    Schedule a meeting
+                    {meeting ? "Edit meeting" : "Schedule a meeting"}
                 </DialogTitle>
                 <DialogDescription>
-                    Pick a time, then share the link with whoever’s joining.
+                    {meeting
+                        ? "The link stays the same, so anyone you’ve shared it with sees the new details."
+                        : "Pick a time, then share the link with whoever’s joining."}
                 </DialogDescription>
             </DialogHeader>
             <ScheduleForm
                 initialSlot={initialSlot}
-                onScheduled={(meeting) => {
-                    setScheduledMeeting(meeting);
-                    // Whichever lists have been loaded pick up the new meeting.
+                meeting={meeting}
+                onSaved={(saved) => {
+                    // Whichever lists have been loaded pick up the change.
                     dispatch(upcomingInvalidated());
                     dispatch(calendarInvalidated());
-                    onScheduled?.(meeting);
+                    onScheduled?.(saved);
+                    if (meeting) {
+                        onClose();
+                        return;
+                    }
+                    setScheduledMeeting(saved);
                 }}
                 onCancel={onClose}
             />
@@ -80,11 +92,13 @@ function ScheduleDialogBody({
     );
 }
 
-// The schedule form as a modal, opened from the home page and the calendar.
+// The schedule form as a modal, opened from the home page and the calendar,
+// to schedule a meeting or edit one.
 export default function ScheduleMeetingDialog({
     open,
     onOpenChange,
     initialSlot,
+    meeting,
     onScheduled,
 }: ScheduleMeetingDialogProps) {
     return (
@@ -98,7 +112,9 @@ export default function ScheduleMeetingDialog({
                 className="max-h-[calc(100svh-2rem)] gap-6 overflow-y-auto bg-card p-5 text-card-foreground sm:max-w-[600px] sm:p-7"
             >
                 <ScheduleDialogBody
+                    key={meeting?._id ?? "new"}
                     initialSlot={initialSlot}
+                    meeting={meeting}
                     onScheduled={onScheduled}
                     onClose={() => {
                         onOpenChange(false);

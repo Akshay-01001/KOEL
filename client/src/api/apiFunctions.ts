@@ -4,6 +4,7 @@ import type {
     LoginPayload,
     RegisterPayload,
     ScheduleMeetingPayload,
+    UpdateMeetingPayload,
 } from "@/api/types/payload.types";
 import type {
     ApiResponse,
@@ -68,6 +69,26 @@ export async function scheduleMeeting(payload: ScheduleMeetingPayload) {
     return getData(data);
 }
 
+// Host only: changes a scheduled meeting. Send only what changed.
+export async function updateMeeting(
+    meetingId: string,
+    payload: UpdateMeetingPayload,
+) {
+    const { data } = await api.patch<ApiResponse<Meeting>>(
+        `/api/meetings/${encodeURIComponent(meetingId)}`,
+        payload,
+    );
+    return getData(data);
+}
+
+// Host only: cancels a scheduled meeting; its link stops working.
+export async function cancelMeeting(meetingId: string) {
+    const { data } = await api.post<ApiResponse<Meeting>>(
+        `/api/meetings/${encodeURIComponent(meetingId)}/cancel`,
+    );
+    return getData(data);
+}
+
 // One page of the meetings the user hosts that are running or still ahead. The server sends 5 per page unless `limit` says otherwise (max 20).
 export async function getUpcomingMeetings(page: number, signal?: AbortSignal) {
     const { data } = await api.get<ApiResponse<UpcomingMeetingsPage>>(
@@ -116,12 +137,21 @@ export async function joinMeeting(
     return getData(data);
 }
 
-// For the host this ends the meeting for everyone. Guests pass the guest_id
-// they got from joinMeeting. Returns the server's message.
+// Closes this person's session; the meeting keeps running, even when the host
+// leaves. Guests pass the guest_id they got from joinMeeting. Returns the
+// server's message.
 export async function leaveMeeting(meetingId: string, guestId?: string | null) {
     const { data } = await api.post<ApiResponse<null>>(
         `/api/meetings/${encodeURIComponent(meetingId)}/leave`,
         guestId ? { guest_id: guestId } : undefined,
     );
     return data.message;
+}
+
+// Host only: ends a running meeting for everyone in it.
+export async function endMeeting(meetingId: string) {
+    const { data } = await api.post<ApiResponse<Meeting>>(
+        `/api/meetings/${encodeURIComponent(meetingId)}/end`,
+    );
+    return getData(data);
 }

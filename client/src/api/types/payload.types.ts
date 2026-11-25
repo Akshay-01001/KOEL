@@ -35,3 +35,13 @@ export type ScheduleMeetingPayload = {
     scheduled_end_at?: string;
     settings: MeetingSettings;
 };
+
+// PATCH /api/meetings/:meetingId (host, scheduled meetings only). Every field is
+// optional; scheduled_end_at: null removes the end time.
+export type UpdateMeetingPayload = {
+    title?: string;
+    description?: string | null;
+    scheduled_start_at?: string;
+    scheduled_end_at?: string | null;
+    settings?: MeetingSettings;
+};

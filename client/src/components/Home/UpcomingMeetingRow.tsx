@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Check, Copy, LoaderCircle } from "lucide-react";
+import {
+    CalendarX,
+    Check,
+    Copy,
+    EllipsisVertical,
+    LoaderCircle,
+    Pencil,
+} from "lucide-react";
 import type { UpcomingMeeting } from "@/api/types/response.types";
 import {
     getDateBlock,
@@ -8,6 +15,12 @@ import {
     getWhenText,
 } from "@/components/Home/upcomingUtils";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getMeetingLink, getMeetingPath } from "@/lib/meetingCode";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +30,9 @@ type UpcomingMeetingRowProps = {
     isStarting: boolean;
     startError?: string;
     onStart: () => void;
+    // Host of a scheduled meeting only: the row menu's Edit and Cancel.
+    onEdit: () => void;
+    onCancel: () => void;
 };
 
 const COPIED_RESET_MS = 2000;
@@ -29,6 +45,8 @@ export default function UpcomingMeetingRow({
     isStarting,
     startError,
     onStart,
+    onEdit,
+    onCancel,
 }: UpcomingMeetingRowProps) {
     const [isCopied, setIsCopied] = useState(false);
 
@@ -59,8 +77,8 @@ export default function UpcomingMeetingRow({
     );
     const badge = getStatusBadge(meeting, now);
     // A host starts a scheduled meeting; everyone else (and a host of a live one) joins.
-    const actionLabel =
-        meeting.is_host && meeting.status === "scheduled" ? "Start" : "Join";
+    const isEditable = meeting.is_host && meeting.status === "scheduled";
+    const actionLabel = isEditable ? "Start" : "Join";
 
     return (
         <li className="flex flex-col gap-2 px-6 py-[18px]">
@@ -161,6 +179,45 @@ export default function UpcomingMeetingRow({
                             {actionLabel}
                         </Link>
                     </Button>
+                )}
+
+                {isEditable && (
+                    // Not modal, so the dialog each item opens can take focus
+                    // as the menu closes.
+                    <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`More options for ${meeting.title}`}
+                                className="-ml-3 size-11 text-muted-foreground"
+                            >
+                                <EllipsisVertical />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={onEdit}>
+                                <Pencil />
+                                Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onSelect={() => {
+                                    void copyLink();
+                                }}
+                            >
+                                <Copy />
+                                Copy link
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={onCancel}
+                            >
+                                <CalendarX />
+                                Cancel meeting
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 )}
             </div>
 

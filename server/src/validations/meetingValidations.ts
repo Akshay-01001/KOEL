@@ -46,6 +46,32 @@ export const createMeetingSchema = Joi.object<CreateMeetingBody>({
     settings: meetingSettingsSchema,
 }).options({ abortEarly: false, stripUnknown: true });
 
+export type UpdateMeetingBody = {
+    title?: string;
+    description?: string | null;
+    scheduled_start_at?: Date;
+    // null removes the end time.
+    scheduled_end_at?: Date | null;
+    // Only the settings sent are changed; the rest keep their values.
+    settings?: MeetingSettingsBody;
+};
+
+// PATCH /api/meetings/:meetingId — any subset of the schedule fields. The end
+// is checked against the start in the controller, since either may be missing.
+export const updateMeetingSchema = Joi.object<UpdateMeetingBody>({
+    title: Joi.string().trim().min(1).max(120),
+    description: Joi.string().trim().max(1000).allow("", null),
+    scheduled_start_at: Joi.date()
+        .iso()
+        .greater("now")
+        .messages({ "date.greater": "The start time must be in the future" }),
+    scheduled_end_at: Joi.date().iso().allow(null),
+    settings: meetingSettingsSchema,
+})
+    .min(1)
+    .messages({ "object.min": "Nothing to change" })
+    .options({ abortEarly: false, stripUnknown: true });
+
 export type UpcomingMeetingsQuery = {
     page: number;
     limit: number;

@@ -67,6 +67,7 @@ export type UpcomingMeeting = {
     scheduled_start_at: string;
     scheduled_end_at: string | null;
     started_at: string | null;
+    settings: MeetingSettings;
     is_host: boolean;
     host_name: string;
 };
@@ -83,9 +84,22 @@ export type CalendarMeeting = {
     scheduled_end_at: string | null;
     started_at: string | null;
     ended_at: string | null;
+    settings: MeetingSettings;
     is_host: boolean;
     host_name: string;
 };
+
+// What the edit form needs from a meeting; full meetings and the rows of the
+// upcoming list and calendar all have it.
+export type EditableMeeting = Pick<
+    Meeting,
+    | "_id"
+    | "title"
+    | "description"
+    | "scheduled_start_at"
+    | "scheduled_end_at"
+    | "settings"
+>;
 
 // `data` of GET /api/meetings/upcoming?page=1&limit=5
 export type UpcomingMeetingsPage = {

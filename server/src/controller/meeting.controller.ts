@@ -27,6 +27,7 @@ import {
     createMeetingSchema,
     joinMeetingSchema,
     leaveMeetingSchema,
+    updateMeetingSchema,
     upcomingMeetingsQuerySchema,
 } from "../validations/meetingValidations.js";
 import { sendResponse, sendValidationError } from "../utils/response.js";
@@ -40,6 +41,20 @@ const STALE_RUNNING_MS = 12 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Safety cap on one calendar response.
 const CALENDAR_MAX_MEETINGS = 500;
+
+// Why a meeting that isn't scheduled or running can't be used any more.
+const getClosedMessage = (status: string) => {
+    return status === MeetingStatus.CANCELLED
+        ? "This meeting was cancelled"
+        : "This meeting has ended";
+};
+
+// Why a meeting can't be edited or cancelled: only scheduled ones can.
+const getNotEditableMessage = (status: string) => {
+    return status === MeetingStatus.RUNNING
+        ? "This meeting has already started"
+        : getClosedMessage(status);
+};
 
 const findMeetingFromParams = async (req: Request, res: Response) => {
     const { meetingId } = req.params;
@@ -147,7 +162,7 @@ export const startMeeting = async (req: Request, res: Response) => {
             );
         }
         if (meeting.status !== MeetingStatus.SCHEDULED) {
-            return sendResponse(res, 409, `This meeting has ${meeting.status}`);
+            return sendResponse(res, 409, getClosedMessage(meeting.status));
         }
 
         const started = await openMeetingRoom(meeting);
@@ -163,6 +178,117 @@ export const startMeeting = async (req: Request, res: Response) => {
     } catch (error) {
         console.error("Failed to start meeting:", error);
         return sendResponse(res, 500, "Failed to start meeting");
+    }
+};
+
+// Host only: changes a scheduled meeting's title, description, times, or
+// settings. Once it has started (or ended, or been cancelled) it can't be edited.
+export const updateMeeting = async (req: Request, res: Response) => {
+    const { value: body, error } = updateMeetingSchema.validate(req.body ?? {});
+    if (error) {
+        return sendValidationError(res, "Invalid request body", error.details);
+    }
+
+    try {
+        const meeting = await findMeetingFromParams(req, res);
+        if (!meeting) return;
+
+        if (!meeting.host_id.equals(req.userId)) {
+            return sendResponse(
+                res,
+                403,
+                "Only the host can edit this meeting",
+            );
+        }
+        if (meeting.status !== MeetingStatus.SCHEDULED) {
+            return sendResponse(
+                res,
+                409,
+                getNotEditableMessage(meeting.status),
+            );
+        }
+
+        const start = body.scheduled_start_at ?? meeting.scheduled_start_at;
+        const end =
+            body.scheduled_end_at === undefined
+                ? meeting.scheduled_end_at
+                : body.scheduled_end_at;
+        if (end && end.getTime() <= start.getTime()) {
+            return sendValidationError(res, "Invalid request body", [
+                { message: "The end time must be after the start time" },
+            ]);
+        }
+
+        const update: Record<string, unknown> = {};
+        if (body.title !== undefined) update.title = body.title;
+        if (body.description !== undefined) {
+            update.description = body.description || null;
+        }
+        if (body.scheduled_start_at !== undefined) {
+            update.scheduled_start_at = body.scheduled_start_at;
+        }
+        if (body.scheduled_end_at !== undefined) {
+            update.scheduled_end_at = body.scheduled_end_at;
+        }
+        for (const [key, setting] of Object.entries(body.settings ?? {})) {
+            update[`settings.${key}`] = setting;
+        }
+
+        // The status check repeats here in case the host started it meanwhile.
+        const updated = await MeetingModel.findOneAndUpdate(
+            { _id: meeting._id, status: MeetingStatus.SCHEDULED },
+            { $set: update },
+            { returnDocument: "after", runValidators: true },
+        );
+        if (!updated) {
+            return sendResponse(res, 409, "This meeting has already started");
+        }
+
+        return sendResponse(res, 200, "Meeting updated", updated);
+    } catch (updateError) {
+        console.error("Failed to update meeting:", updateError);
+        return sendResponse(res, 500, "Failed to update meeting");
+    }
+};
+
+// Host only: cancels a scheduled meeting. Its link stops working; a running
+// meeting is ended instead (see endMeeting).
+export const cancelMeeting = async (req: Request, res: Response) => {
+    try {
+        const meeting = await findMeetingFromParams(req, res);
+        if (!meeting) return;
+
+        if (!meeting.host_id.equals(req.userId)) {
+            return sendResponse(
+                res,
+                403,
+                "Only the host can cancel this meeting",
+            );
+        }
+        if (meeting.status === MeetingStatus.RUNNING) {
+            return sendResponse(
+                res,
+                409,
+                "This meeting has already started. End it for everyone instead.",
+            );
+        }
+        if (meeting.status !== MeetingStatus.SCHEDULED) {
+            return sendResponse(res, 409, getClosedMessage(meeting.status));
+        }
+
+        const cancelled = await MeetingModel.findOneAndUpdate(
+            { _id: meeting._id, status: MeetingStatus.SCHEDULED },
+            { $set: { status: MeetingStatus.CANCELLED } },
+            { returnDocument: "after" },
+        );
+        if (!cancelled) {
+            return sendResponse(res, 409, "This meeting has already started");
+        }
+
+        return sendResponse(res, 200, "Meeting cancelled", cancelled);
+    } catch (error) {
+        console.error("Failed to cancel meeting:", error);
+        return sendResponse(res, 500, "Failed to cancel meeting");
     }
 };
 
@@ -213,7 +339,7 @@ export const joinMeeting = async (req: Request, res: Response) => {
         }
 
         if (meeting.status !== MeetingStatus.RUNNING) {
-            return sendResponse(res, 410, `This meeting has ${meeting.status}`);
+            return sendResponse(res, 410, getClosedMessage(meeting.status));
         }
 
         const guestId = userId ? null : createGuestId();
@@ -250,7 +376,8 @@ export const joinMeeting = async (req: Request, res: Response) => {
 };
 
 // Signed-in users leave by cookie; guests send the guest_id they got from join.
-// When the host leaves a running meeting, it ends for everyone.
+// Leaving only closes the caller's own session, even for the host: the meeting
+// keeps running until the host ends it (see endMeeting).
 export const leaveMeeting = async (req: Request, res: Response) => {
     const { value: body, error } = leaveMeetingSchema.validate(req.body ?? {});
     if (error) {
@@ -278,14 +405,6 @@ export const leaveMeeting = async (req: Request, res: Response) => {
             return sendResponse(res, 200, "Left the meeting");
         }
 
-        if (
-            meeting.host_id.equals(userId) &&
-            meeting.status === MeetingStatus.RUNNING
-        ) {
-            await closeMeetingRoom(meeting);
-            return sendResponse(res, 200, "Meeting ended for everyone");
-        }
-
         await closeOpenSessions(
             { meeting_id: meeting._id, user_id: userId },
             new Date(),
@@ -294,6 +413,39 @@ export const leaveMeeting = async (req: Request, res: Response) => {
     } catch (error) {
         console.error("Failed to leave meeting:", error);
         return sendResponse(res, 500, "Failed to leave meeting");
+    }
+};
+
+// Host only: ends a running meeting for everyone. Closes every open session and
+// deletes the LiveKit room, which disconnects everyone still in the call.
+export const endMeeting = async (req: Request, res: Response) => {
+    try {
+        const meeting = await findMeetingFromParams(req, res);
+        if (!meeting) return;
+
+        if (!meeting.host_id.equals(req.userId)) {
+            return sendResponse(res, 403, "Only the host can end this meeting");
+        }
+
+        if (meeting.status !== MeetingStatus.RUNNING) {
+            return sendResponse(
+                res,
+                409,
+                meeting.status === MeetingStatus.SCHEDULED
+                    ? "This meeting hasn't started"
+                    : getClosedMessage(meeting.status),
+            );
+        }
+
+        const ended = await closeMeetingRoom(meeting);
+        if (!ended) {
+            return sendResponse(res, 409, "This meeting is no longer running");
+        }
+
+        return sendResponse(res, 200, "Meeting ended for everyone", ended);
+    } catch (error) {
+        console.error("Failed to end meeting:", error);
+        return sendResponse(res, 500, "Failed to end meeting");
     }
 };
 
@@ -360,6 +512,7 @@ export const getUpcomingMeetings = async (req: Request, res: Response) => {
                     scheduled_start_at: meeting.scheduled_start_at,
                     scheduled_end_at: meeting.scheduled_end_at,
                     started_at: meeting.started_at,
+                    settings: meeting.settings,
                     is_host: host ? host._id.equals(req.userId) : false,
                     host_name: host?.name ?? "Unknown host",
                 };
@@ -438,6 +591,7 @@ export const getCalendarMeetings = async (req: Request, res: Response) => {
                     scheduled_end_at: meeting.scheduled_end_at,
                     started_at: meeting.started_at,
                     ended_at: meeting.ended_at,
+                    settings: meeting.settings,
                     is_host: host ? host._id.equals(req.userId) : false,
                     host_name: host?.name ?? "Unknown host",
                 };
