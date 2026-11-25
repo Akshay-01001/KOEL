@@ -1,7 +1,19 @@
-import { useRef, type ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { CalendarDays } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { DATE_PLACEHOLDER, maskDateInput, parseDate } from "@/lib/dateFormat";
+import {
+    Popover,
+    PopoverAnchor,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+    DATE_PLACEHOLDER,
+    formatDate,
+    maskDateInput,
+    parseDate,
+} from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
 
 type DateFieldProps = Omit<
@@ -15,17 +27,8 @@ type DateFieldProps = Omit<
     min?: Date;
 };
 
-const pad = (value: number) => {
-    return String(value).padStart(2, "0");
-};
-
-// "YYYY-MM-DD", the value the browser's native date picker works with.
-const toIsoDay = (date: Date) => {
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-};
-
 // A date typed as DD/MM/YYYY (the slashes are added while typing), with a
-// button that opens the browser's date picker for those who'd rather pick.
+// button that opens a calendar under the field for those who'd rather pick.
 export default function DateField({
     value,
     onValueChange,
@@ -34,66 +37,61 @@ export default function DateField({
     disabled,
     ...inputProps
 }: DateFieldProps) {
-    const pickerRef = useRef<HTMLInputElement>(null);
+    const [isOpen, setIsOpen] = useState(false);
 
     const parsed = parseDate(value);
-    const pickerValue = parsed
-        ? `${parsed.year}-${pad(parsed.month)}-${pad(parsed.day)}`
-        : "";
-
-    const openPicker = () => {
-        const picker = pickerRef.current;
-        if (!picker) return;
-        try {
-            picker.showPicker();
-        } catch {
-            // Older browsers without showPicker(): typing still works.
-            picker.focus();
-        }
-    };
+    const selected = parsed
+        ? new Date(parsed.year, parsed.month - 1, parsed.day)
+        : null;
 
     return (
-        <div className="relative">
-            <Input
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder={DATE_PLACEHOLDER}
-                maxLength={DATE_PLACEHOLDER.length}
-                value={value}
-                disabled={disabled}
-                onChange={(event) => {
-                    onValueChange(maskDateInput(event.target.value));
-                }}
-                className={cn("pr-12", className)}
-                {...inputProps}
-            />
-            {/* The native picker, kept invisible under the field so its popup opens there. */}
-            <input
-                ref={pickerRef}
-                type="date"
-                tabIndex={-1}
-                aria-hidden="true"
-                min={min ? toIsoDay(min) : undefined}
-                value={pickerValue}
-                disabled={disabled}
-                onChange={(event) => {
-                    const [year, month, day] = event.target.value.split("-");
-                    if (year && month && day) {
-                        onValueChange(`${day}/${month}/${year}`);
-                    }
-                }}
-                className="pointer-events-none absolute inset-x-0 bottom-0 h-0 w-full opacity-0"
-            />
-            <button
-                type="button"
-                aria-label="Choose a date"
-                disabled={disabled}
-                onClick={openPicker}
-                className="absolute top-1/2 right-1 flex size-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
-            >
-                <CalendarDays className="size-4" />
-            </button>
-        </div>
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+            {/* The calendar lines up with the whole field, not just the button. */}
+            <PopoverAnchor asChild>
+                <div className="relative">
+                    <Input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder={DATE_PLACEHOLDER}
+                        maxLength={DATE_PLACEHOLDER.length}
+                        value={value}
+                        disabled={disabled}
+                        onChange={(event) => {
+                            onValueChange(maskDateInput(event.target.value));
+                        }}
+                        className={cn("pr-12", className)}
+                        {...inputProps}
+                    />
+                    <PopoverTrigger asChild>
+                        <button
+                            type="button"
+                            aria-label="Choose a date"
+                            disabled={disabled}
+                            className="absolute top-1/2 right-1 flex size-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+                        >
+                            <CalendarDays className="size-4" />
+                        </button>
+                    </PopoverTrigger>
+                </div>
+            </PopoverAnchor>
+            <PopoverContent align="start">
+                <Calendar
+                    mode="single"
+                    // Sunday first, like the Calendar page.
+                    weekStartsOn={0}
+                    selected={selected ?? undefined}
+                    defaultMonth={selected ?? min}
+                    disabled={min ? { before: min } : undefined}
+                    // Focuses the picked day (or today) when it opens.
+                    autoFocus
+                    onSelect={(day) => {
+                        if (!day) return;
+                        onValueChange(formatDate(day));
+                        setIsOpen(false);
+                    }}
+                />
+            </PopoverContent>
+        </Popover>
     );
 }
