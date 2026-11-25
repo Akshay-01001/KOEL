@@ -2,7 +2,6 @@ import { useState } from "react";
 import type { EditableMeeting, Meeting } from "@/api/types/response.types";
 import ScheduleForm from "@/components/Schedule/ScheduleForm";
 import ScheduledConfirmation from "@/components/Schedule/ScheduledConfirmation";
-import type { ScheduleSlot } from "@/components/Schedule/scheduleUtils";
 import {
     Dialog,
     DialogContent,
@@ -17,9 +16,9 @@ import { upcomingInvalidated } from "@/store/slices/upcomingSlice";
 type ScheduleMeetingDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    // Fills in the date and times (e.g. a slot picked on the calendar); without
+    // Fills in the date and time (e.g. a slot picked on the calendar); without
     // it they start empty.
-    initialSlot?: ScheduleSlot;
+    initialStart?: Date;
     // Edit mode: change this meeting instead of scheduling a new one. The modal
     // closes once the changes are saved.
     meeting?: EditableMeeting;
@@ -29,7 +28,7 @@ type ScheduleMeetingDialogProps = {
 };
 
 type ScheduleDialogBodyProps = {
-    initialSlot?: ScheduleSlot;
+    initialStart?: Date;
     meeting?: EditableMeeting;
     onScheduled?: (meeting: Meeting) => void;
     onClose: () => void;
@@ -38,7 +37,7 @@ type ScheduleDialogBodyProps = {
 // What's inside the modal: the form, then the confirmation once it's saved.
 // Radix unmounts this on close, so every open starts with a fresh form.
 function ScheduleDialogBody({
-    initialSlot,
+    initialStart,
     meeting,
     onScheduled,
     onClose,
@@ -73,7 +72,7 @@ function ScheduleDialogBody({
                 </DialogDescription>
             </DialogHeader>
             <ScheduleForm
-                initialSlot={initialSlot}
+                initialStart={initialStart}
                 meeting={meeting}
                 onSaved={(saved) => {
                     // Whichever lists have been loaded pick up the change.
@@ -97,7 +96,7 @@ function ScheduleDialogBody({
 export default function ScheduleMeetingDialog({
     open,
     onOpenChange,
-    initialSlot,
+    initialStart,
     meeting,
     onScheduled,
 }: ScheduleMeetingDialogProps) {
@@ -113,7 +112,7 @@ export default function ScheduleMeetingDialog({
             >
                 <ScheduleDialogBody
                     key={meeting?._id ?? "new"}
-                    initialSlot={initialSlot}
+                    initialStart={initialStart}
                     meeting={meeting}
                     onScheduled={onScheduled}
                     onClose={() => {

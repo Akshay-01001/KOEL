@@ -8,7 +8,6 @@ import DateField from "@/components/Schedule/DateField";
 import MoreOptions from "@/components/Schedule/MoreOptions";
 import {
     DEFAULT_MEETING_SETTINGS,
-    type ScheduleSlot,
     combineDateAndTime,
     getTimeZoneLabel,
     toDateInputValue,
@@ -31,13 +30,12 @@ type FieldErrors = {
     title?: string;
     date?: string;
     startTime?: string;
-    endTime?: string;
 };
 
 type ScheduleFormProps = {
-    // Fills in the date and times, e.g. from a slot picked on the calendar.
+    // Fills in the date and time, e.g. from a slot picked on the calendar.
     // Without it they start empty, showing DD/MM/YYYY and HH:MM.
-    initialSlot?: ScheduleSlot;
+    initialStart?: Date;
     // Edit mode: the form starts with this meeting's details and saves changes
     // to it instead of scheduling a new one.
     meeting?: EditableMeeting;
@@ -45,18 +43,10 @@ type ScheduleFormProps = {
     onCancel: () => void;
 };
 
-// The date and times the form starts with: the meeting being edited, else the
-// picked slot, else nothing.
-function getInitialSlot(meeting?: EditableMeeting, slot?: ScheduleSlot) {
-    if (meeting) {
-        return {
-            start: new Date(meeting.scheduled_start_at),
-            end: meeting.scheduled_end_at
-                ? new Date(meeting.scheduled_end_at)
-                : null,
-        };
-    }
-    return slot;
+// The start the form begins with: the meeting being edited, else the picked
+// slot, else nothing.
+function getInitialStart(meeting?: EditableMeeting, picked?: Date) {
+    return meeting ? new Date(meeting.scheduled_start_at) : picked;
 }
 
 const FIELD_CLASS = "h-11 bg-card px-3.5 text-[15px]";
@@ -64,29 +54,22 @@ const FIELD_CLASS = "h-11 bg-card px-3.5 text-[15px]";
 // Title, description, date and time, and meeting settings. Schedules a new
 // meeting, or with `meeting` edits that one.
 export default function ScheduleForm({
-    initialSlot: slot,
+    initialStart: picked,
     meeting,
     onSaved,
     onCancel,
 }: ScheduleFormProps) {
     const isEditing = meeting !== undefined;
-    const [initialSlot] = useState(() => {
-        return getInitialSlot(meeting, slot);
+    const [initialStart] = useState(() => {
+        return getInitialStart(meeting, picked);
     });
     const [title, setTitle] = useState(meeting?.title ?? "");
     const [description, setDescription] = useState(meeting?.description ?? "");
     const [date, setDate] = useState(() => {
-        return initialSlot ? toDateInputValue(initialSlot.start) : "";
+        return initialStart ? toDateInputValue(initialStart) : "";
     });
     const [startTime, setStartTime] = useState(() => {
-        return initialSlot ? toTimeInputValue(initialSlot.start) : "";
-    });
-    // The end shares the start's date, so leave it empty if the slot crosses midnight.
-    const [endTime, setEndTime] = useState(() => {
-        if (!initialSlot?.end) return "";
-        const { start, end } = initialSlot;
-        const sameDay = toDateInputValue(end) === toDateInputValue(start);
-        return sameDay ? toTimeInputValue(end) : "";
+        return initialStart ? toTimeInputValue(initialStart) : "";
     });
     // Today, for the earliest day the date picker offers.
     const [today] = useState(() => {
@@ -111,11 +94,10 @@ export default function ScheduleForm({
         setFormError(null);
 
         const start = combineDateAndTime(date, startTime);
-        const end = endTime ? combineDateAndTime(date, endTime) : null;
         // When editing, an unchanged start may already have passed (a meeting
         // that wasn't started on time); only a new start must be in the future.
         const isStartChanged =
-            !isEditing || start?.getTime() !== initialSlot?.start.getTime();
+            !isEditing || start?.getTime() !== initialStart?.getTime();
         const errors: FieldErrors = {};
 
         if (!title.trim()) errors.title = "Add a title";
@@ -131,11 +113,6 @@ export default function ScheduleForm({
         } else if (isStartChanged && start && start.getTime() <= Date.now()) {
             errors.startTime = "Pick a time in the future";
         }
-        if (endTime && !parseTime(endTime)) {
-            errors.endTime = "Enter the end time as HH:MM (24-hour)";
-        } else if (start && end && end.getTime() <= start.getTime()) {
-            errors.endTime = "The end time must be after the start time";
-        }
 
         setFieldErrors(errors);
         if (Object.values(errors).some(Boolean) || !start) return;
@@ -149,14 +126,12 @@ export default function ScheduleForm({
                       ...(isStartChanged && {
                           scheduled_start_at: start.toISOString(),
                       }),
-                      scheduled_end_at: end?.toISOString() ?? null,
                       settings,
                   })
                 : await scheduleMeeting({
                       title: title.trim(),
                       description: description.trim() || undefined,
                       scheduled_start_at: start.toISOString(),
-                      scheduled_end_at: end?.toISOString(),
                       settings,
                   });
             onSaved(saved);
@@ -242,7 +217,6 @@ export default function ScheduleForm({
                                 setDate(value);
                                 clearFieldError("date");
                                 clearFieldError("startTime");
-                                clearFieldError("endTime");
                             }}
                             className={FIELD_CLASS}
                         />
@@ -268,37 +242,6 @@ export default function ScheduleForm({
                             onChange={(event) => {
                                 setStartTime(maskTimeInput(event.target.value));
                                 clearFieldError("startTime");
-                                clearFieldError("endTime");
-                            }}
-                            className={FIELD_CLASS}
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="end-time">
-                            Ends
-                            <span className="font-normal text-muted-foreground">
-                                (optional)
-                            </span>
-                        </Label>
-                        <Input
-                            id="end-time"
-                            type="text"
-                            inputMode="numeric"
-                            autoComplete="off"
-                            placeholder={TIME_PLACEHOLDER}
-                            maxLength={TIME_PLACEHOLDER.length}
-                            value={endTime}
-                            aria-invalid={
-                                fieldErrors.endTime ? true : undefined
-                            }
-                            aria-describedby={
-                                fieldErrors.endTime
-                                    ? "end-time-error"
-                                    : undefined
-                            }
-                            onChange={(event) => {
-                                setEndTime(maskTimeInput(event.target.value));
-                                clearFieldError("endTime");
                             }}
                             className={FIELD_CLASS}
                         />
@@ -315,14 +258,6 @@ export default function ScheduleForm({
                         className="text-[13px] text-destructive"
                     >
                         {fieldErrors.startTime}
-                    </p>
-                )}
-                {fieldErrors.endTime && (
-                    <p
-                        id="end-time-error"
-                        className="text-[13px] text-destructive"
-                    >
-                        {fieldErrors.endTime}
                     </p>
                 )}
                 {timeZoneLabel && (

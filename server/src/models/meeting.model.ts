@@ -78,10 +78,6 @@ const meetingSchema = new Schema(
             type: Date,
             required: true,
         },
-        scheduled_end_at: {
-            type: Date,
-            default: null,
-        },
         started_at: {
             type: Date,
             default: null,

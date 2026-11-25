@@ -25,10 +25,7 @@ import CalendarToolbar from "@/components/Calendar/CalendarToolbar";
 import MeetingDialog from "@/components/Calendar/MeetingDialog";
 import CancelMeetingDialog from "@/components/Schedule/CancelMeetingDialog";
 import ScheduleMeetingDialog from "@/components/Schedule/ScheduleMeetingDialog";
-import {
-    type ScheduleSlot,
-    getSlotForCalendarSelection,
-} from "@/components/Schedule/scheduleUtils";
+import { getStartForCalendarSelection } from "@/components/Schedule/scheduleUtils";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
@@ -164,17 +161,18 @@ function getDefaultView(): CalendarView {
         : "timeGridDay";
 }
 
+// FullCalendar's default slot length in the week and day views.
+const SLOT_MS = 30 * 60 * 1000;
+
 const startOfToday = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return today;
 };
 
-// Where the meeting sits on the calendar: its scheduled times, or when it
-// actually ended if it had no end time. With neither, the calendar gives it
-// its default length.
+// Where the meeting's block ends on the calendar: when it actually ended, for
+// meetings that have. Otherwise the calendar gives it its default length.
 function getEventEnd(meeting: CalendarMeeting) {
-    if (meeting.scheduled_end_at) return meeting.scheduled_end_at;
     if (
         meeting.ended_at &&
         new Date(meeting.ended_at) > new Date(meeting.scheduled_start_at)
@@ -238,7 +236,7 @@ export default function CalendarPage() {
     const [selectedMeeting, setSelectedMeeting] =
         useState<CalendarMeeting | null>(null);
     const [isMeetingOpen, setIsMeetingOpen] = useState(false);
-    const [scheduleSlot, setScheduleSlot] = useState<ScheduleSlot | undefined>(
+    const [scheduleStart, setScheduleStart] = useState<Date | undefined>(
         undefined,
     );
     const [isScheduleOpen, setIsScheduleOpen] = useState(false);
@@ -263,8 +261,8 @@ export default function CalendarPage() {
         return calendarRef.current?.getApi();
     };
 
-    const openSchedule = (slot?: ScheduleSlot) => {
-        setScheduleSlot(slot);
+    const openSchedule = (start?: Date) => {
+        setScheduleStart(start);
         setIsScheduleOpen(true);
     };
 
@@ -309,25 +307,28 @@ export default function CalendarPage() {
         setIsMeetingOpen(true);
     };
 
-    // Only the future can be picked: a time range that hasn't fully passed
-    // (week/day views), or a day from today on (month view).
+    // Meetings only have a start time, so one slot (week/day views) or one day
+    // (month view) can be picked, not a range. Only the future: a slot that
+    // hasn't fully passed, or a day from today on.
     const isSelectable = (span: DateSpanApi) => {
-        if (span.allDay)
-            return span.start.getTime() >= startOfToday().getTime();
-        return span.end.getTime() > Date.now();
+        if (span.allDay) {
+            // Compared by date, not hours, so 23- and 25-hour days count as one.
+            const nextDay = new Date(span.start);
+            nextDay.setDate(nextDay.getDate() + 1);
+            return (
+                span.end.getTime() <= nextDay.getTime() &&
+                span.start.getTime() >= startOfToday().getTime()
+            );
+        }
+        const length = span.end.getTime() - span.start.getTime();
+        return length <= SLOT_MS && span.end.getTime() > Date.now();
     };
 
-    // Clicking a time slot, or dragging across several, opens the schedule
-    // modal with exactly that start and end. In the month view, picking a day
-    // opens it for that day.
+    // Clicking a time slot opens the schedule modal starting at that time. In
+    // the month view, picking a day opens it for that day.
     const handleSelect = (info: DateSelectInfo) => {
         openSchedule(
-            getSlotForCalendarSelection(
-                info.start,
-                info.end,
-                info.allDay,
-                new Date(),
-            ),
+            getStartForCalendarSelection(info.start, info.allDay, new Date()),
         );
     };
 
@@ -446,7 +447,7 @@ export default function CalendarPage() {
                     // Clear the highlighted slot once the modal is closed.
                     if (!open) getApi()?.unselect();
                 }}
-                initialSlot={scheduleSlot}
+                initialStart={scheduleStart}
             />
         </div>
     );

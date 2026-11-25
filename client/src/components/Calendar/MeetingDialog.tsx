@@ -110,10 +110,7 @@ function MeetingDialogBody({
     };
 
     const badge = STATUS_BADGES[meeting.status];
-    const when = formatMeetingTime(
-        new Date(meeting.scheduled_start_at),
-        meeting.scheduled_end_at ? new Date(meeting.scheduled_end_at) : null,
-    );
+    const when = formatMeetingTime(new Date(meeting.scheduled_start_at));
 
     let actionLabel = "Join";
     if (isHostStart) actionLabel = isStarting ? "Starting…" : "Start meeting";

@@ -31,16 +31,6 @@ export const isSameDay = (a: Date, b: Date) => {
     );
 };
 
-// "11:00 – 11:45", or just "11:00" without an end. An end on another day gets
-// its date too: "23:30 – 24/11/2026 00:30".
-export function formatTimeRange(start: Date, end: Date | null) {
-    if (!end) return formatTime(start);
-    const endText = isSameDay(start, end)
-        ? formatTime(end)
-        : `${formatDate(end)} ${formatTime(end)}`;
-    return `${formatTime(start)} – ${endText}`;
-}
-
 // Shapes typed text into fixed-size digit groups, e.g. [2, 2, 4] with "/" for a
 // date. Separators are added as each group fills. A separator typed after a
 // single digit pads that group instead: "9:" -> "09", "2/" -> "02".

@@ -33,8 +33,9 @@ import {
 import { sendResponse, sendValidationError } from "../utils/response.js";
 
 const MAX_CODE_ATTEMPTS = 5;
-// A scheduled meeting with no end time stays listed this long after its start time.
-const NO_END_TIME_GRACE_MS = 60 * 60 * 1000;
+// A scheduled meeting stays listed this long after its start time, so a host
+// running late can still start it.
+const SCHEDULED_GRACE_MS = 60 * 60 * 1000;
 // A meeting still "running" after this long was most likely abandoned (the host
 // closed the tab instead of pressing Leave), so it's left off the list.
 const STALE_RUNNING_MS = 12 * 60 * 60 * 1000;
@@ -77,13 +78,7 @@ export const createMeeting = async (req: Request, res: Response) => {
         return sendValidationError(res, "Invalid request body", error.details);
     }
 
-    const {
-        title,
-        description,
-        scheduled_start_at,
-        scheduled_end_at,
-        settings,
-    } = value;
+    const { title, description, scheduled_start_at, settings } = value;
     const isInstant = !scheduled_start_at;
 
     try {
@@ -102,7 +97,6 @@ export const createMeeting = async (req: Request, res: Response) => {
                     description: description || null,
                     host_id: req.userId,
                     scheduled_start_at: scheduled_start_at ?? new Date(),
-                    scheduled_end_at: scheduled_end_at ?? null,
                     // Instant meetings let guests in unless the request says otherwise;
                     // scheduled ones follow the "Allow guests" setting (off by default).
                     settings: isInstant
@@ -208,17 +202,6 @@ export const updateMeeting = async (req: Request, res: Response) => {
             );
         }
 
-        const start = body.scheduled_start_at ?? meeting.scheduled_start_at;
-        const end =
-            body.scheduled_end_at === undefined
-                ? meeting.scheduled_end_at
-                : body.scheduled_end_at;
-        if (end && end.getTime() <= start.getTime()) {
-            return sendValidationError(res, "Invalid request body", [
-                { message: "The end time must be after the start time" },
-            ]);
-        }
-
         const update: Record<string, unknown> = {};
         if (body.title !== undefined) update.title = body.title;
         if (body.description !== undefined) {
@@ -226,9 +209,6 @@ export const updateMeeting = async (req: Request, res: Response) => {
         }
         if (body.scheduled_start_at !== undefined) {
             update.scheduled_start_at = body.scheduled_start_at;
-        }
-        if (body.scheduled_end_at !== undefined) {
-            update.scheduled_end_at = body.scheduled_end_at;
         }
         for (const [key, setting] of Object.entries(body.settings ?? {})) {
             update[`settings.${key}`] = setting;
@@ -472,13 +452,8 @@ export const getUpcomingMeetings = async (req: Request, res: Response) => {
                 },
                 {
                     status: MeetingStatus.SCHEDULED,
-                    scheduled_end_at: { $gt: new Date(now) },
-                },
-                {
-                    status: MeetingStatus.SCHEDULED,
-                    scheduled_end_at: null,
                     scheduled_start_at: {
-                        $gt: new Date(now - NO_END_TIME_GRACE_MS),
+                        $gt: new Date(now - SCHEDULED_GRACE_MS),
                     },
                 },
             ],
@@ -510,7 +485,6 @@ export const getUpcomingMeetings = async (req: Request, res: Response) => {
                     description: meeting.description,
                     status: meeting.status,
                     scheduled_start_at: meeting.scheduled_start_at,
-                    scheduled_end_at: meeting.scheduled_end_at,
                     started_at: meeting.started_at,
                     settings: meeting.settings,
                     is_host: host ? host._id.equals(req.userId) : false,
@@ -526,8 +500,7 @@ export const getUpcomingMeetings = async (req: Request, res: Response) => {
 
 // Meetings shown on the calendar between ?from and ?to (ISO dates): the ones the
 // user hosts plus the ones they've joined, in any status, soonest first.
-// A meeting is included if any part of it falls inside the range; one without
-// an end time counts as a moment at its start.
+// A meeting is included if its start time falls inside the range.
 export const getCalendarMeetings = async (req: Request, res: Response) => {
     const { value: query, error: queryError } =
         calendarMeetingsQuerySchema.validate(req.query);
@@ -557,16 +530,7 @@ export const getCalendarMeetings = async (req: Request, res: Response) => {
                         { _id: { $in: joinedMeetingIds } },
                     ],
                 },
-                { scheduled_start_at: { $lt: to } },
-                {
-                    $or: [
-                        { scheduled_end_at: { $gt: from } },
-                        {
-                            scheduled_end_at: null,
-                            scheduled_start_at: { $gte: from },
-                        },
-                    ],
-                },
+                { scheduled_start_at: { $gte: from, $lt: to } },
             ],
         })
             .sort({ scheduled_start_at: 1, _id: 1 })
@@ -588,7 +552,6 @@ export const getCalendarMeetings = async (req: Request, res: Response) => {
                     description: meeting.description,
                     status: meeting.status,
                     scheduled_start_at: meeting.scheduled_start_at,
-                    scheduled_end_at: meeting.scheduled_end_at,
                     started_at: meeting.started_at,
                     ended_at: meeting.ended_at,
                     settings: meeting.settings,

@@ -1,10 +1,5 @@
 import type { UpcomingMeeting } from "@/api/types/response.types";
-import {
-    formatDate,
-    formatTime,
-    formatTimeRange,
-    isSameDay,
-} from "@/lib/dateFormat";
+import { formatDate, formatTime, isSameDay } from "@/lib/dateFormat";
 
 const MINUTE_MS = 60_000;
 // Show "Starts in N min" when a meeting is this close.
@@ -20,17 +15,14 @@ export function getDateBlock(date: Date) {
     };
 }
 
-// "Today, 20:30 – 21:15", "Tomorrow, 11:00", "25/11/2026, 16:00 – 16:30",
-// or "Started 20:31" for a meeting that's live.
+// "Today, 20:30", "Tomorrow, 11:00", "25/11/2026, 16:00", or "Started 20:31"
+// for a meeting that's live.
 export function getWhenText(meeting: UpcomingMeeting, now: Date) {
     if (meeting.status === "running" && meeting.started_at) {
         return `Started ${formatTime(new Date(meeting.started_at))}`;
     }
 
     const start = new Date(meeting.scheduled_start_at);
-    const end = meeting.scheduled_end_at
-        ? new Date(meeting.scheduled_end_at)
-        : null;
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate() + 1);
 
@@ -43,7 +35,7 @@ export function getWhenText(meeting: UpcomingMeeting, now: Date) {
         day = formatDate(start);
     }
 
-    return `${day}, ${formatTimeRange(start, end)}`;
+    return `${day}, ${formatTime(start)}`;
 }
 
 // The small badge next to the title, if any.

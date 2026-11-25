@@ -27,21 +27,19 @@ export type CreateMeetingPayload = {
 };
 
 // POST /api/meetings with a scheduled_start_at saves it for later.
-// Dates are ISO strings; scheduled_end_at is optional.
+// Dates are ISO strings.
 export type ScheduleMeetingPayload = {
     title: string;
     description?: string;
     scheduled_start_at: string;
-    scheduled_end_at?: string;
     settings: MeetingSettings;
 };
 
 // PATCH /api/meetings/:meetingId (host, scheduled meetings only). Every field is
-// optional; scheduled_end_at: null removes the end time.
+// optional.
 export type UpdateMeetingPayload = {
     title?: string;
     description?: string | null;
     scheduled_start_at?: string;
-    scheduled_end_at?: string | null;
     settings?: MeetingSettings;
 };

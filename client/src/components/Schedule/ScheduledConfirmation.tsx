@@ -45,9 +45,6 @@ export default function ScheduledConfirmation({
     };
 
     const start = new Date(meeting.scheduled_start_at);
-    const end = meeting.scheduled_end_at
-        ? new Date(meeting.scheduled_end_at)
-        : null;
 
     return (
         <div className="flex flex-col items-center gap-4 px-2 py-6 text-center">
@@ -66,7 +63,7 @@ export default function ScheduledConfirmation({
                         {meeting.title}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        {formatMeetingTime(start, end)}
+                        {formatMeetingTime(start)}
                     </p>
                 </div>
             </DialogDescription>

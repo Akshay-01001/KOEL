@@ -41,7 +41,6 @@ export type Meeting = {
     host_id: string;
     status: MeetingStatus;
     scheduled_start_at: string;
-    scheduled_end_at: string | null;
     started_at: string | null;
     ended_at: string | null;
     settings: MeetingSettings;
@@ -65,7 +64,6 @@ export type UpcomingMeeting = {
     description: string | null;
     status: "scheduled" | "running";
     scheduled_start_at: string;
-    scheduled_end_at: string | null;
     started_at: string | null;
     settings: MeetingSettings;
     is_host: boolean;
@@ -81,7 +79,6 @@ export type CalendarMeeting = {
     description: string | null;
     status: MeetingStatus;
     scheduled_start_at: string;
-    scheduled_end_at: string | null;
     started_at: string | null;
     ended_at: string | null;
     settings: MeetingSettings;
@@ -93,12 +90,7 @@ export type CalendarMeeting = {
 // upcoming list and calendar all have it.
 export type EditableMeeting = Pick<
     Meeting,
-    | "_id"
-    | "title"
-    | "description"
-    | "scheduled_start_at"
-    | "scheduled_end_at"
-    | "settings"
+    "_id" | "title" | "description" | "scheduled_start_at" | "settings"
 >;
 
 // `data` of GET /api/meetings/upcoming?page=1&limit=5
